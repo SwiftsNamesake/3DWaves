@@ -1,0 +1,6 @@
+*.sublime-workspace
+*.exe
+*.hi
+*.o
+bin/
+build.bat
