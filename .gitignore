@@ -3,4 +3,4 @@
 *.hi
 *.o
 dist/
-!dist/doc
+!dist/doc/*
