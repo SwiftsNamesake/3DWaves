@@ -36,13 +36,11 @@ module Wavefront (parseOBJ, parseMTL, main) where
 ---------------------------------------------------------------------------------------------------
 -- We'll need these
 ---------------------------------------------------------------------------------------------------
-import Data.List (isPrefixOf, groupBy, unfoldr)
+import Data.List (isPrefixOf, unfoldr)
 import Data.Char (isSpace)
-import Data.Function (on)
 import Data.Either (rights)
 
 import Text.Printf (printf)
-import Control.Concurrent (threadDelay)
 import System.IO (hFlush, stdout)
 
 
@@ -231,7 +229,6 @@ splitOn :: Eq a => a -> [a] -> [[a]]
 splitOn c s = unfoldr cut s
   where cut [] = Nothing
         cut xs = let (token, rest) = span (/=c) xs in Just (token, dropWhile (==c) rest)
--- splitOn c s = filter (/=[c]) . groupBy ((==) `on` (==c)) $ s
 
 
 -- |
