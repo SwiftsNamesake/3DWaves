@@ -2,5 +2,5 @@
 *.exe
 *.hi
 *.o
-bin/
-build.bat
+dist/
+!dist/doc
