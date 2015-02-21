@@ -4,7 +4,8 @@
 --
 -- Jonatan H Sundqvist
 -- February 8 2015
---
+-- 
+-- Migrated to separate project on February 21 2015
 
 -- TODO | - Appropriate container types (eg. bytestring, vector)
 --        - Grammar specification
@@ -26,6 +27,7 @@
 --        -
 
 
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 module Wavefront (parseOBJ, parseMTL, main) where
 
@@ -136,7 +138,7 @@ parseOBJ = zip [1..] . map parseOBJRow . lines -- . rows
 -- let rows = parseOBJ data in ([ v | @v(Vertex {}) <- rows], [ v | @v(Vertex {}) <- rows])
 
 
--- |
+-- | Generates a token given a single
 --
 -- TODO: Correctness (complete function, no runtime exceptions)
 -- TODO: Rename 'which' (?)
@@ -288,6 +290,14 @@ promptContinue prompt = do
   hFlush stdout
   getChar
   putChar '\n'
+
+
+
+---------------------------------------------------------------------------------------------------
+-- Pure foreign function interface
+---------------------------------------------------------------------------------------------------
+-- foreign export ccall parseOBJ :: String -> OBJ
+-- foreign export ccall parseMTL :: String -> MTL
 
 
 
