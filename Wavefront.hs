@@ -202,6 +202,10 @@ parseMTLRow ln
 -- TODO: How to retrieve MTL data
 -- TODO: How to deal with errors, including no-parse, index errors, etc.
 -- TODO: Performance, how are 'copies' of coordinates handled (?)
+-- TODO: Use a more efficient data structure (especially w.r.t indexing; cf. Vector)
+-- TODO: Consider preserving the indices (rather than generating a list of duplicated vertices).
+--       This would preserve space (in cases where vertices are often re-used), as well as being
+--       very compatible with index arrays on graphics cards.
 createModel :: OBJ -> ([String] -> [MTL]) -> Model
 createModel modeldata retrieve = let tokens    = rights . map snd $ modeldata -- TODO: Vat do vee du viz ze dissidents, kommandant?
                                      materials = retrieve [ name | UseMTL name <- tokens] -- Retrieve MTL data
