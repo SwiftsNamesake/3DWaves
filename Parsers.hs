@@ -1,5 +1,5 @@
 --
--- Wavefront.hs
+-- Wavefront - Parsers.hs
 -- Parser and loader for WaveFront obj models
 --
 -- Jonatan H Sundqvist
@@ -11,17 +11,18 @@
 --        - Grammar specification
 --        - Incremental parsing (?)
 --        - Improve naming scheme
---        - Separate MTL and OBJ parsers (?)
---        - Separate parsing, IO and testing
+--        - Separate MTL and OBJ parsers (?) (...)
+--        - Separate parsing, IO and testing (...)
 --        - Additional attributes (lighting, splines, etc.)
---        - FFI
---        - Debugging information (line number, missing file, missing values, etc.)
---        - Proper Haddock coverage, including headers
---        - Model type
+--        - FFI (...)
+--        - Debugging information (line number, missing file, missing values, etc.) (...)
+--        - Proper Haddock coverage, including headers (...)
+--        - Model type (...)
 --        - Caching (?)
 --        - Performance, profiling, optimisations
 --        - PrintfArg instances for the types defined in this module
 --        - Decide on a public interface (exports)
+--        - Reconciling Cabal and hierarchical modules
 
 -- SPEC | -
 --        -
@@ -29,7 +30,7 @@
 
 {-# LANGUAGE ForeignFunctionInterface #-}
 
-module Wavefront.Parsers (parseOBJ, parseMTL, main) where
+module Parsers (parseOBJ, parseMTL, loadOBJ, loadMTL) where
 
 
 
@@ -39,18 +40,18 @@ module Wavefront.Parsers (parseOBJ, parseMTL, main) where
 import Data.List (isPrefixOf, unfoldr)
 import Data.Char (isSpace)
 import Data.Either (rights)
-
-import Text.Printf (printf)
-import System.IO (hFlush, stdout)
+import qualified Data.Map as M
 
 
 
 ---------------------------------------------------------------------------------------------------
 -- Types
 ---------------------------------------------------------------------------------------------------
--- |
+-- | Represents a single (valid) OBJ token
+--
 -- TODO: Polymorphic numerical types (?)
 -- TODO: Add context, metadata (eg. line numbers, filename) (?)
+--
 data OBJToken = Vertex  Float Float Float |
                 Normal  Float Float Float |
                 Texture Float Float       |
@@ -65,14 +66,18 @@ data OBJToken = Vertex  Float Float Float |
 
 
 -- |
+--
 -- TODO: Use error type instead of String (?)
 -- This would allow us to distinguish invalid data from eg. comments and blank lines
+--
 type OBJRow = Either String OBJToken
 
 
--- |
+-- | Output type of the OBJ parser. Currently a list of line number and token (or error string) pairs
+--
 -- TODO: Rename (?)
 -- TODO: Use Integral for line number (?)
+--
 type OBJ = [(Int, OBJRow)]
 
 
@@ -81,22 +86,24 @@ type OBJ = [(Int, OBJRow)]
 --
 -- TODO: Rename (?)
 -- TODO: Include metadata, comments, rejected data (?)
--- TODO: Separate type for processeed OBJTokens (ie. token + context)
+-- TODO: Separate type for processed OBJTokens (ie. token + context)
 -- TODO: Perform index lookups (?)
+-- TODO: Reconsider the types (especially of the materials)
 --
 data Model = Model { vertices  :: [OBJToken],
                      normals   :: [OBJToken],
                      textures  :: [OBJToken],
                      faces     :: [OBJToken],
-                     selects   :: [OBJToken], -- TODO: Rename (UseMTL) (?) 
-                     materials :: [OBJToken],
+                     selects   :: [OBJToken],              -- TODO: Rename (UseMTL) (?) 
+                     materials :: M.Map String [MTLToken], -- TODO: Type synonym (?)
                      groups    :: [OBJToken],
                      objects   :: [OBJToken] } deriving (Show)
 
 
--- | 
+-- | Represents a single (valid) MTL token
 --
 -- TODO: Is the alpha channel optional, ignored, disallowed?
+-- TODO: Include support for ('Ns', 'Ni', 'd', 'Tr', 'illum')
 -- 
 data MTLToken = Ambient  Float Float Float | -- Ka
                 Diffuse  Float Float Float | -- Kd
@@ -105,14 +112,16 @@ data MTLToken = Ambient  Float Float Float | -- Ka
         MapDiffuse String | -- map_Kd
         Material   String   -- newmtl
         deriving (Eq, Show)
-        -- ('Ns', 'Ni', 'd', 'Tr', 'illum')
 
 
--- |
+-- | Output type of the single-row MTL parser. 
 type MTLRow = Either String MTLToken
 
 
--- |
+-- | Output type of the MTL parser. Currently a list of line number and token (or error string) pairs
+--
+-- TODO: Add type for processed MTL (eg. a map between names and materials)
+--
 type MTL = [(Int, MTLRow)]
 
 
@@ -206,7 +215,8 @@ parseMTLRow ln
 -- TODO: Consider preserving the indices (rather than generating a list of duplicated vertices).
 --       This would preserve space (in cases where vertices are often re-used), as well as being
 --       very compatible with index arrays on graphics cards.
-createModel :: OBJ -> ([String] -> [MTL]) -> Model
+--
+createModel :: OBJ -> ([String] -> M.Map String [MTLToken]) -> Model
 createModel modeldata retrieve = let tokens       = rights . map snd $ modeldata -- TODO: Vat do vee du viz ze dissidents, kommandant?
                                      theMaterials = retrieve [ name | UseMTL name   <- tokens ] -- Retrieve MTL data
                                      theVertices  = [ vertex  | vertex@(Vertex{})   <- tokens ]
@@ -215,14 +225,16 @@ createModel modeldata retrieve = let tokens       = rights . map snd $ modeldata
                                      theFaces     = [ face    | face@(Face{})       <- tokens ]
                                      theGroups    = [ group   | group@(Face{})      <- tokens ]
                                      theObjects   = [ object  | object@(Face{})     <- tokens ]
+                                     theSelects   = [ select  | select@(Face{})     <- tokens ]
+                                     theObject    = [ object  | object@(Face{})     <- tokens ]
                                  in Model { vertices  = theVertices,
                                             normals   = theNormals,
                                             textures  = theTextures,
                                             faces     = theFaces,
-                                            -- selects   = theMaterials, -- TODO: Rename (UseMTL) (?) 
-                                            -- materials = theMaterials,
+                                            selects   = theSelects, -- TODO: Rename (UseMTL) (?) 
                                             groups    = theGroups,
-                                            objects   = theObjects } 
+                                            objects   = theObjects,
+                                            materials = theMaterials } 
 
 
 -- Parsing utilities ------------------------------------------------------------------------------
@@ -247,7 +259,7 @@ isComment = isPrefixOf "#" . dropWhile isSpace
 
 
 -- | Splits a string into rows and filters out unimportant elements (empty lines and comments)
--- NOTE: This function is probably obsolete due to 
+-- NOTE: This function is probably obsolete due to comments being included by the parsers
 -- TODO: Higher order function for composing predicates
 rows :: String -> [String]
 rows = filter (\ ln -> not $ any ($ ln) [null, isComment]) . lines
@@ -290,49 +302,9 @@ loadModel fn = do
   return $ error "Not done yet"
 
 
---  -----------------------------------------------------------------------------------
--- | 
-promptContinue :: String -> IO ()
-promptContinue prompt = do
-  putStr prompt
-  hFlush stdout
-  getChar
-  putChar '\n'
-
-
 
 ---------------------------------------------------------------------------------------------------
 -- Pure foreign function interface
 ---------------------------------------------------------------------------------------------------
 -- foreign export ccall parseOBJ :: String -> OBJ
 -- foreign export ccall parseMTL :: String -> MTL
-
-
-
----------------------------------------------------------------------------------------------------
--- Entry point
----------------------------------------------------------------------------------------------------
-main :: IO ()
-main = do
-  putStrLn "This is where the checks should be."
-
-  let path = "C:/Users/Jonatan/Desktop/Python/experiments/WaveFront/"
-  
-  flip mapM_ ["queen", "cube"] $ \ fn -> do
-    printf "\nParsing OBJ file: %s.obj\n" fn
-    model <- loadOBJ $ printf (path ++ "data/%s.obj") fn
-    printf "Found %d invalid rows in OBJ file (n comments, m blanks, o errors).\n" $ length [ 1 | Left _ <- map snd model ]
-
-    promptContinue "Press any key to continue..."
-
-    mapM (uncurry $ printf "[%d] %s") [ (n, show token) | (n, Right token) <- model ]
-    -- TODO: Print culprit lines (✓)
-
-    promptContinue "Press any key to continue..."
-
-    printf "\nParsing MTL file: %s.mtl\n" fn
-    materials <- loadMTL $ printf (path ++ "data/%s.mtl") fn
-    printf "Found %d invalid rows in MTL file (n comments, m blanks, o errors).\n" $ length [ 1 | Left _ <- map snd materials ]
-    mapM (uncurry $ printf "[%d] %s") [ (n, show token) | (n, Right token) <- materials ]
-
-    promptContinue "Press any key to continue..."
