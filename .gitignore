@@ -1,6 +1,3 @@
 *.sublime-workspace
-*.exe
-*.hi
-*.o
 dist/
 !dist/doc/*
