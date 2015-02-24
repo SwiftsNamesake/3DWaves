@@ -16,6 +16,5 @@ I may at some point implement the FFI and add direct OpenGL support, in separate
 ##Maintainers
 Jonatan H Sundqvist
 
-TODO
-----
+##TODO
 There is currently no standalone list of tasks (cf. source files).
