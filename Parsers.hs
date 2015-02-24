@@ -23,6 +23,7 @@
 --        - PrintfArg instances for the types defined in this module
 --        - Decide on a public interface (exports)
 --        - Reconciling Cabal and hierarchical modules
+--        - Dealing with paths in lib statements (requires knowledge of working directories)
 
 -- SPEC | -
 --        -
