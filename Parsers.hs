@@ -204,7 +204,7 @@ parseMTLRow ln
           withChannels _      _         = Left  $ "Pattern match failed"           -- TODO: No alpha channel (optional?) (?) (read a)
 
           withName token (name:[]) = Right $ token name
-          withName _      _        = Left "Pattern match failed"
+          withName _      _        = Left  $ "Pattern match failed"
 
 
 -- | 
