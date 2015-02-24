@@ -1,3 +1,4 @@
 *.sublime-workspace
-/dist/*
-!/dist/doc/*
+!dist/
+dist/*
+!dist/doc/*
