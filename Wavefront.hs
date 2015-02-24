@@ -16,7 +16,7 @@
 --        - Additional attributes (lighting, splines, etc.)
 --        - FFI
 --        - Debugging information (line number, missing file, missing values, etc.)
---        - Proper Haddock coverate, including headers
+--        - Proper Haddock coverage, including headers
 --        - Model type
 --        - Caching (?)
 --        - Performance, profiling, optimisations
@@ -29,7 +29,7 @@
 
 {-# LANGUAGE ForeignFunctionInterface #-}
 
-module Wavefront (parseOBJ, parseMTL, main) where
+module Wavefront.Parsers (parseOBJ, parseMTL, main) where
 
 
 
@@ -207,23 +207,23 @@ parseMTLRow ln
 --       This would preserve space (in cases where vertices are often re-used), as well as being
 --       very compatible with index arrays on graphics cards.
 createModel :: OBJ -> ([String] -> [MTL]) -> Model
-createModel modeldata retrieve = let tokens    = rights . map snd $ modeldata -- TODO: Vat do vee du viz ze dissidents, kommandant?
-                                     materials = retrieve [ name | UseMTL name <- tokens] -- Retrieve MTL data
-                                     vertices  = [ vertex  | vertex@(Vertex{})   <- tokens ]
-                                     normals   = [ normal  | normal@(Normal{})   <- tokens ]
-                                     textures  = [ texture | texture@(Texture{}) <- tokens ]
-                                 in error "Still under construction. Step away or put on a hard hat."
+createModel modeldata retrieve = let tokens       = rights . map snd $ modeldata -- TODO: Vat do vee du viz ze dissidents, kommandant?
+                                     theMaterials = retrieve [ name | UseMTL name   <- tokens ] -- Retrieve MTL data
+                                     theVertices  = [ vertex  | vertex@(Vertex{})   <- tokens ]
+                                     theNormals   = [ normal  | normal@(Normal{})   <- tokens ]
+                                     theTextures  = [ texture | texture@(Texture{}) <- tokens ]
+                                     theFaces     = [ face    | face@(Face{})       <- tokens ]
+                                     theGroups    = [ group   | group@(Face{})      <- tokens ]
+                                     theObjects   = [ object  | object@(Face{})     <- tokens ]
+                                 in Model { vertices  = theVertices,
+                                            normals   = theNormals,
+                                            textures  = theTextures,
+                                            faces     = theFaces,
+                                            -- selects   = theMaterials, -- TODO: Rename (UseMTL) (?) 
+                                            -- materials = theMaterials,
+                                            groups    = theGroups,
+                                            objects   = theObjects } 
 
-
-{-let model = Model { vertices  = [ vertex   | @vertex(Vertex{})],
-                      normals   = [ normal   | @normal(Normal{})],
-                      textures  = [ texture  | @texture(Texture{})],
-                      faces     = [ face     | @face(Face{})],
-                      selects   = [ select   | @select(Vertex{})],
-                      materials = [ material | @material(Vertex{})],
-                      groups    = [ group    | @group(Vertex{})],
-                      objects   = [ object   | @object(Vertex{})] }
--}
 
 -- Parsing utilities ------------------------------------------------------------------------------
 -- |
@@ -235,13 +235,20 @@ splitOn c s = unfoldr cut s
         cut xs = let (token, rest) = span (/=c) xs in Just (token, dropWhile (==c) rest)
 
 
--- |
+-- | Predicate for determining if a String is a comment. Comments are preceded by a '#' and any
+-- number of whitespace characters (not including linebreaks). Support for comments at the end
+-- of a line has yet to be added.
+--
 -- TODO: Drop comments at the end of a line (?)
+-- TODO: Add stripComment (or extractComment) which consumes a line up until the first '#'.
+-- This would allow for tokens and comments to appear on the same line.
 isComment :: String -> Bool
 isComment = isPrefixOf "#" . dropWhile isSpace
 
 
--- |
+-- | Splits a string into rows and filters out unimportant elements (empty lines and comments)
+-- NOTE: This function is probably obsolete due to 
+-- TODO: Higher order function for composing predicates
 rows :: String -> [String]
 rows = filter (\ ln -> not $ any ($ ln) [null, isComment]) . lines
 
@@ -318,7 +325,7 @@ main = do
 
     promptContinue "Press any key to continue..."
 
-    mapM_ print ["[" ++ show n ++ "] " ++ show token | (n, Right token) <- model ]
+    mapM (uncurry $ printf "[%d] %s") [ (n, show token) | (n, Right token) <- model ]
     -- TODO: Print culprit lines (✓)
 
     promptContinue "Press any key to continue..."
@@ -326,6 +333,6 @@ main = do
     printf "\nParsing MTL file: %s.mtl\n" fn
     materials <- loadMTL $ printf (path ++ "data/%s.mtl") fn
     printf "Found %d invalid rows in MTL file (n comments, m blanks, o errors).\n" $ length [ 1 | Left _ <- map snd materials ]
-    mapM_ print ["[" ++ show n ++ "] " ++ show token | (n, Right token) <- materials ]
+    mapM (uncurry $ printf "[%d] %s") [ (n, show token) | (n, Right token) <- materials ]
 
     promptContinue "Press any key to continue..."
