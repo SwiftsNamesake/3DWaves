@@ -24,14 +24,15 @@
 --        - Decide on a public interface (exports)
 --        - Reconciling Cabal and hierarchical modules
 --        - Dealing with paths in lib statements (requires knowledge of working directories)
+--        - Move comments and specification to separate files (eg. README)
+--        - Inline comments (for internals, implementation)
 
 -- SPEC | -
 --        -
 
 
-{-# LANGUAGE ForeignFunctionInterface #-}
 
-module Parsers (parseOBJ, parseMTL, loadOBJ, loadMTL) where
+module Southpaw.WaveFront.Parsers (parseOBJ, parseMTL, loadOBJ, loadMTL, MTL(), OBJ()) where
 
 
 
@@ -146,11 +147,11 @@ parseOBJ = zip [1..] . map parseOBJRow . lines -- . rows
 -- let rows = parseOBJ data in ([ v | @v(Vertex {}) <- rows], [ v | @v(Vertex {}) <- rows])
 
 
--- | Generates a token given a single
+-- | Generates a token given a single valid OBJ row, or an error value if the input is malformed. 
 --
 -- TODO: Correctness (complete function, no runtime exceptions)
 -- TODO: Rename 'which' (?)
--- TODO: Handle invalid rows
+-- TODO: Handle invalid rows (how to deal with mangled definitions w.r.t indices?)
 -- TODO: Extract value parsing logic (eg. pattern matching, converting, handle errors)
 -- TODO: Named errors (typed?) rather than Nothing (cf. Either) (?)
 -- TODO: Additional values, currently unsupported attributes (ignore?) (pattern match against the entire line, eg. ["vn", x, y, z])
@@ -170,14 +171,16 @@ parseOBJRow ln
     -- TODO: Clean this up
     -- TODO: Handle invalid data (✓)
     -- TODO: Capture invalid vertex definitions (cf. sequence) (✓)
-    -- ("Invalid vertex: "++) .
-    "f"  -> either (Left . const ln) (Right . Face) . sequence . map (vector triplet . splitOn '/') $ values -- Face
+    -- TODO: Deal with missing indices some other way (reflect it in the output somehow, using the Maybe type?)
+    -- We append two additional indices to the index list, since `triplet` expects a three-tuple. Otherwise, omitting the optional
+    -- texture and normal indices would lead to an error.
+    "f"  -> either (Left . const ln) (Right . Face) . sequence . map (vector triplet . take 3 . (++ ["1", "1"]) . splitOn '/') $ values -- Face
     "g"  -> Right . Group  $ values -- Group
     "o"  -> Right . Object $ values -- Object
-    "s"  -> Left ln -- Smooth shading
+    "s"  -> Left ln                 -- Smooth shading
     "mtllib" -> Right . LibMTL $ head values --
     "usemtl" -> Right . UseMTL $ head values --
-    _        -> Left ln
+    _        -> Left ln -- TODO More informative errors
     where triplet a b c = (a, b, c) -- TODO: Use tuple sections (?)
 
 
@@ -212,6 +215,7 @@ parseMTLRow ln
 -- TODO: How to retrieve MTL data
 -- TODO: How to deal with errors, including no-parse, index errors, etc.
 -- TODO: Performance, how are 'copies' of coordinates handled (?)
+-- TODO: Performance, one pass (with a fold perhaps)
 -- TODO: Use a more efficient data structure (especially w.r.t indexing; cf. Vector)
 -- TODO: Consider preserving the indices (rather than generating a list of duplicated vertices).
 --       This would preserve space (in cases where vertices are often re-used), as well as being
@@ -269,9 +273,10 @@ rows = filter (\ ln -> not $ any ($ ln) [null, isComment]) . lines
 -- |
 -- TODO: Use readMaybe (?)
 -- TODO: Variadic 'unpacking' (or is that sinful?)
+-- TODO: Rename (?)
 vector :: Read r => (r -> r -> r -> b) -> [String] -> Either String b
 vector token (x:y:z:[]) = Right $ token (read x) (read y) (read z) -- TODO: Add back the Maybe wrapper (?)
-vector _      _         = Left  "Pattern match failed"
+vector _      _         = Left  $ "Pattern match failed"
 
 
 
@@ -280,7 +285,9 @@ vector _      _         = Left  "Pattern match failed"
 ---------------------------------------------------------------------------------------------------
 -- Loading data -----------------------------------------------------------------------------------
 -- |
+--
 -- TODO: Use bytestrings (?)
+--
 loadOBJ :: String -> IO OBJ
 loadOBJ fn = do
   rawOBJ <- readFile fn    --
@@ -288,10 +295,13 @@ loadOBJ fn = do
 
 
 -- |
+--
 -- TODO: Use bytestrings (?)
+-- TODO: Merge OBJ and MTL parsers (and plug in format-specific code as needed) (?)
+--
 loadMTL :: String -> IO MTL
 loadMTL fn = do
-  rawMTL <- readFile fn    --
+  rawMTL <- readFile fn    -- Unparsed MTL data (text)
   return $ parseMTL rawMTL --
 
 
@@ -301,11 +311,3 @@ loadModel :: String -> IO Model
 loadModel fn = do
   obj <- loadOBJ fn
   return $ error "Not done yet"
-
-
-
----------------------------------------------------------------------------------------------------
--- Pure foreign function interface
----------------------------------------------------------------------------------------------------
--- foreign export ccall parseOBJ :: String -> OBJ
--- foreign export ccall parseMTL :: String -> MTL

@@ -14,7 +14,7 @@
 
 
 
-module Checks where
+module Southpaw.WaveFront.Checks where
 
 
 
@@ -22,10 +22,13 @@ module Checks where
 -- We'll need these
 ---------------------------------------------------------------------------------------------------
 import Text.Printf (printf)
-import Data.Either (rights, lefts)
+import Data.Either (lefts)
+import Data.Char (toLower)
 import System.IO (hFlush, stdout)
 
-import Parsers (loadOBJ, loadMTL)
+import Control.Monad (forM_, when)
+
+import WaveFront.Parsers (loadOBJ, loadMTL, MTL, OBJ)
 
 
 ---------------------------------------------------------------------------------------------------
@@ -39,6 +42,37 @@ promptContinue prompt = do
   hFlush stdout
   getChar
   putChar '\n'
+
+
+-- | 
+-- 
+-- TODO: Refactor (cf. untilM)
+-- TODO: Allow flexible feedback
+-- TODO: Default return value for invalid replies (?)
+-- TODO: Customisable validation (eg. for other languages than English)
+--
+askYesNo :: String -> IO Bool
+askYesNo q = do
+  putStr q
+  hFlush stdout
+  answer <- getLine
+  affirmed $ map toLower answer
+  where affirmed answer | answer `elem` ["yes", "y", "yeah"] = return True
+                        | answer `elem` ["no", "n", "nah"]   = return False
+                        | otherwise                          = askYesNo "I don't understand. Answer 'yes' or 'no': "
+  -- return [(`elem` ["yes", "y", "yeah"]), (`elem` "no", "n", "nah")]
+
+
+-- |
+askPerformAction :: String -> IO () -> IO ()
+askPerformAction q action = do
+  affirmed <- askYesNo q
+  when affirmed action
+
+
+-- |
+showTokens :: Show a => [(Int, Either String a)] -> IO ()
+showTokens materials = mapM_ (uncurry $ printf "[%d] %s\n") [ (n, show token) | (n, Right token) <- materials ] -- TODO: cf. line 65
 
 
 
@@ -55,10 +89,19 @@ main = do
 
   let path = "C:/Users/Jonatan/Desktop/Python/experiments/WaveFront/"
   
-  flip mapM_ ["queen", "cube"] $ \ fn -> do
+  forM_ ["queen", "cube"] $ \ fn -> do
     printf "\nParsing OBJ file: %s.obj\n" fn
     model <- loadOBJ $ printf (path ++ "data/%s.obj") fn
-    printf "Found %d invalid rows in OBJ file (n comments, m blanks, o errors).\n" . length . lefts $ map snd model
+    -- TODO: Utility for partioning a list based on several predicates ([a] -> [a -> Bool] -> [[a]])
+    -- TODO: Utilities for displaying output and asking for input
+    -- TODO: Oh, the efficiency!
+    -- TODO: Less ugly naming convention for monadic functions which ignore the output (cf. mapM_, forM_, etc.)
+    let unparsed = lefts $ map snd model
+    let comments = filter ('#' `elem`) unparsed
+    let blanks   = filter null unparsed
+    let errors   = length unparsed - (length comments + length blanks)
+    printf "Found %d invalid rows in OBJ file (%d comments, %d blanks, %d errors).\n" (length unparsed) (length comments) (length blanks) errors
+    when (length unparsed > 0) . askPerformAction "Would you like to see view them (yes/no)? " $ putStrLn "Ok, here they are:" >> mapM_ print unparsed
 
     promptContinue "Press any key to continue..."
 
@@ -69,6 +112,6 @@ main = do
     printf "\nParsing MTL file: %s.mtl\n" fn
     materials <- loadMTL $ printf (path ++ "data/%s.mtl") fn
     printf "Found %d invalid rows in MTL file (n comments, m blanks, o errors).\n" . length . lefts $ map snd materials
-    mapM (uncurry $ printf "[%d] %s\n") [ (n, show token) | (n, Right token) <- materials ]
+    showTokens materials
 
     promptContinue "Press any key to continue..."
