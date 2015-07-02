@@ -28,7 +28,7 @@ import System.IO (hFlush, stdout)
 
 import Control.Monad (forM_, when)
 
-import WaveFront.Parsers (loadOBJ, loadMTL, MTL, OBJ)
+import Southpaw.WaveFront.Parsers (loadOBJ, loadMTL, MTL, OBJ)
 
 
 ---------------------------------------------------------------------------------------------------

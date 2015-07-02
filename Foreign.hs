@@ -27,7 +27,7 @@ module Southpaw.WaveFront.Foreign where
 ---------------------------------------------------------------------------------------------------
 import Foreign.Storable
 import qualified Foreign.C as C
-import qualified WaveFront.Parsers as Parsers
+import qualified Southpaw.WaveFront.Parsers as Parsers
 
 import System.IO.Unsafe (unsafePerformIO)
 
