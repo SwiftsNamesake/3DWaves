@@ -26,6 +26,9 @@
 --        - Dealing with paths in lib statements (requires knowledge of working directories)
 --        - Move comments and specification to separate files (eg. README)
 --        - Inline comments (for internals, implementation)
+--
+--        - Parser bugs
+--          -- Negative coordinates enclosed in parentheses
 
 -- SPEC | -
 --        -
@@ -39,9 +42,18 @@ module Southpaw.WaveFront.Parsers (parseOBJ, parseMTL, loadOBJ, loadMTL, MTL(), 
 ---------------------------------------------------------------------------------------------------
 -- We'll need these
 ---------------------------------------------------------------------------------------------------
-import Data.List (isPrefixOf, unfoldr)
+import Data.List (isPrefixOf)
 import Data.Char (isSpace)
-import Data.Either (rights)
+
+import Data.Either (rights, isLeft)
+
+import Text.Printf (printf)
+import System.IO (hFlush, stdout)
+import Control.Monad (forM_)
+-- import Control.Concurrent (threadDelay)
+
+import Southpaw.Utilities.Utilities (split)
+
 import qualified Data.Map as M
 
 
@@ -68,10 +80,8 @@ data OBJToken = Vertex  Float Float Float |
 
 
 -- |
---
--- TODO: Use error type instead of String (?)
--- This would allow us to distinguish invalid data from eg. comments and blank lines
---
+-- TODO: Use error type instead of String, allowing us to distinguish invalid data
+--       from eg. comments and blank lines (?)
 type OBJRow = Either String OBJToken
 
 
@@ -158,11 +168,13 @@ parseOBJ = zip [1..] . map parseOBJRow . lines -- . rows
 -- TODO: Dealing with MTL definitions (pass in names, MTL value, return list of MTL dependencies)
 -- TODO: Take 1-based indexing into account straight away (?)
 -- TODO: Deal with absent texture and normal indices
+-- TODO: Strip trailing comments (✓)
+-- TODO: Don't ignore leftover values (errors?)
 --
 parseOBJRow :: String -> OBJRow -- Maybe OBJToken
 parseOBJRow ln
   | isComment ln || null ln = Left ln
-  | otherwise               = let (which:values) = words ln in case which of
+  | otherwise               = let (which:values) = words $ dropComment ln in case which of
     "v"  -> vector Vertex values -- Vertex
     "vn" -> vector Normal values -- Normal
     -- TODO: Clean this up
@@ -172,9 +184,11 @@ parseOBJRow ln
     -- TODO: Handle invalid data (✓)
     -- TODO: Capture invalid vertex definitions (cf. sequence) (✓)
     -- TODO: Deal with missing indices some other way (reflect it in the output somehow, using the Maybe type?)
+    -- TODO: More generic way of unpacking the right number of values and applying read (?)
     -- We append two additional indices to the index list, since `triplet` expects a three-tuple. Otherwise, omitting the optional
     -- texture and normal indices would lead to an error.
-    "f"  -> either (Left . const ln) (Right . Face) . sequence . map (vector triplet . take 3 . (++ ["1", "1"]) . splitOn '/') $ values -- Face
+
+    "f"  -> either (Left . const ln) (Right . Face) . sequence . map (vector triplet . take 3 . (++ ["1", "1"]) . split '/') $ values -- Face
     "g"  -> Right . Group  $ values -- Group
     "o"  -> Right . Object $ values -- Object
     "s"  -> Left ln                 -- Smooth shading
@@ -243,15 +257,6 @@ createModel modeldata retrieve = let tokens       = rights . map snd $ modeldata
 
 
 -- Parsing utilities ------------------------------------------------------------------------------
--- |
--- TODO: Clean up or use existing function
--- TODO: Rename (?)
-splitOn :: Eq a => a -> [a] -> [[a]]
-splitOn c s = unfoldr cut s
-  where cut [] = Nothing
-        cut xs = let (token, rest) = span (/=c) xs in Just (token, dropWhile (==c) rest)
-
-
 -- | Predicate for determining if a String is a comment. Comments are preceded by a '#' and any
 -- number of whitespace characters (not including linebreaks). Support for comments at the end
 -- of a line has yet to be added.
@@ -261,6 +266,11 @@ splitOn c s = unfoldr cut s
 -- This would allow for tokens and comments to appear on the same line.
 isComment :: String -> Bool
 isComment = isPrefixOf "#" . dropWhile isSpace
+
+
+-- |
+dropComment :: String -> String
+dropComment = takeWhile (/= '#')
 
 
 -- | Splits a string into rows and filters out unimportant elements (empty lines and comments)
@@ -311,3 +321,51 @@ loadModel :: String -> IO Model
 loadModel fn = do
   obj <- loadOBJ fn
   return $ error "Not done yet"
+
+
+
+-- General utilities ------------------------------------------------------------------------------
+-- | Counts the number of elements that satisfy the predicate
+count :: (a -> Bool) -> [a] -> Int
+count p = length . filter p
+
+
+
+-- IO utilities -----------------------------------------------------------------------------------
+-- | 
+promptContinue :: String -> IO ()
+promptContinue prompt = do
+  putStr prompt
+  hFlush stdout
+  getChar
+  putChar '\n'
+
+
+
+---------------------------------------------------------------------------------------------------
+-- Entry point
+---------------------------------------------------------------------------------------------------
+main :: IO ()
+main = do
+  putStrLn "This is where the checks should be."
+
+  let path = "C:/Users/Jonatan/Desktop/Python/experiments/WaveFront/"
+  
+  forM_ ["queen", "cube"] $ \ fn -> do
+    printf "\nParsing OBJ file: %s.obj\n" fn
+    model <- loadOBJ $ printf (path ++ "data/%s.obj") fn
+    printf "Found %d invalid rows in OBJ file (m comments, n blanks, o errors).\n" (count isLeft $ map snd model)
+
+    promptContinue "Press any key to continue..."
+
+    mapM_ print ["[" ++ show n ++ "] " ++ show token | (n, Right token) <- model ]
+    -- TODO: Print culprit lines (✓)
+
+    promptContinue "Press any key to continue..."
+
+    printf "\nParsing MTL file: %s.mtl\n" fn
+    materials <- loadMTL $ printf (path ++ "data/%s.mtl") fn
+    printf "Found %d invalid rows in MTL file (m comments, n blanks, o errors).\n" (count isLeft $ map snd materials)
+    mapM_ print ["[" ++ show n ++ "] " ++ show token | (n, Right token) <- materials ]
+
+    promptContinue "Press any key to continue..."
