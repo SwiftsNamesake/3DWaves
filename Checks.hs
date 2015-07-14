@@ -71,8 +71,8 @@ askPerformAction q action = do
 
 
 -- |
-showTokens :: Show a => [(Int, Either String a)] -> IO ()
-showTokens materials = mapM_ (uncurry $ printf "[%d] %s\n") [ (n, show token) | (n, Right token) <- materials ] -- TODO: cf. line 65
+showTokens :: Show a => [(Int, Either String a, String)] -> IO ()
+showTokens materials = mapM_ (uncurry $ printf "[%d] %s\n") [ (n, show token) | (n, Right token, comment) <- materials ] -- TODO: cf. line 65
 
 
 
@@ -96,7 +96,7 @@ main = do
     -- TODO: Utilities for displaying output and asking for input
     -- TODO: Oh, the efficiency!
     -- TODO: Less ugly naming convention for monadic functions which ignore the output (cf. mapM_, forM_, etc.)
-    let unparsed = lefts $ map snd model
+    let unparsed = lefts $ map second model
     let comments = filter ('#' `elem`) unparsed
     let blanks   = filter null unparsed
     let errors   = length unparsed - (length comments + length blanks)
@@ -105,13 +105,14 @@ main = do
 
     promptContinue "Press any key to continue..."
 
-    mapM (uncurry $ printf "[%d] %s\n") [ (n, show token) | (n, Right token) <- model ]
+    mapM (uncurry $ printf "[%d] %s\n") [ (n, show token) | (n, Right token, comment) <- model ]
 
     promptContinue "Press any key to continue..."
 
     printf "\nParsing MTL file: %s.mtl\n" fn
-    materials <- loadMTL $ printf (path ++ "data/%s.mtl") fn
-    printf "Found %d invalid rows in MTL file (n comments, m blanks, o errors).\n" . length . lefts $ map snd materials
+    materials <- loadMTL $ printf "%sdata/%s.mtl" path fn
+    printf "Found %d invalid rows in MTL file (n comments, m blanks, o errors).\n" . length . lefts $ map second materials
     showTokens materials
 
     promptContinue "Press any key to continue..."
+    where second (_, b, _) = b
