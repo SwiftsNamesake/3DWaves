@@ -240,7 +240,7 @@ parseOBJRow ln = withoutComment ln $ \ tokens -> let (which:values) = words toke
     _        -> Left ln -- TODO More informative errors
     where ivertex [svi, sti, sni] = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, readMaybe sni) -- TODO: Refactor, simplify
           ivertex indices         = Left  $ "Face vertex with too many indices: " ++ show indices         --
-          texture coords@[sx, sy] = vector (\ [x, y] -> OBJTexture x y) coords                            -- TOOD: Refactor
+          texture coords@[_, _] = vector (\ [x, y] -> OBJTexture x y) coords                            -- TOOD: Refactor
           texture values   = Left $ "Texture token with the wrong number of coordinates: " ++ show values -- 
 
 
@@ -265,11 +265,11 @@ parseMTLRow ln = withoutComment ln $ \ tokens -> let (which:values) = words toke
     "map_Kd" -> withName MapDiffuse values  -- map_Kd
     "newmtl" -> withName NewMaterial values -- newmtl
     _        -> Left ln
-    where withChannels token (sr:sg:sb:rest)  = vector (\[r, g, b] -> token r g b $ listToMaybe rest >>= readMaybe) [sr, sg, sb] -- TODO: Refactor, simplify
-          withChannels _      _            = Left "Wrong number of colour channels"
+    where withChannels token (sr:sg:sb:rest) = vector (\[r, g, b] -> token r g b $ listToMaybe rest >>= readMaybe) [sr, sg, sb] -- TODO: Refactor, simplify
+          withChannels _      _              = Left "Wrong number of colour channels"
 
-          withName token (name:[]) = Right $ token name
-          withName _      _        = Left  $ "Pattern match failed"
+          withName token [name] = Right $ token name
+          withName _      _     = Left  $ "Wrong number of names"
 
 
 -- Parser output churners (OBJ) -------------------------------------------------------------------
@@ -299,7 +299,7 @@ buildIndexMapWith tokens = Map.fromList . pairwise zipIndices . reverse . addLas
           Group   names -> (nfaces,   (names, nfaces):groups')
           Object  names -> (nfaces,   (names, nfaces):groups')
           OBJFace _     -> (nfaces+1, groups')
-          _             -> (nfaces, groups')
+          _             -> (nfaces,   groups')
 
 
 -- |
