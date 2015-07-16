@@ -227,9 +227,7 @@ parseOBJRow :: String -> OBJRow -- Maybe OBJToken
 parseOBJRow ln = withoutComment ln $ \ tokens -> let (which:values) = words tokens in case which of
     "v"  -> vector OBJVertex values -- Vertex
     "vn" -> vector OBJNormal values -- Normal
-    -- TODO: Clean this up
-    -- TODO: More generic way of unpacking the right number of values and applying read (?)
-    "vt" -> let (x:y:[]) = values in Right $ OBJTexture (read x) (read y) -- Texture
+    "vt" -> texture values -- Texture
     -- TODO: Clean this up (✓)
     -- TODO: Handle invalid data (✓)
     -- TODO: Capture invalid vertex definitions (cf. sequence) (✓)
@@ -244,6 +242,8 @@ parseOBJRow ln = withoutComment ln $ \ tokens -> let (which:values) = words toke
     _        -> Left ln -- TODO More informative errors
     where vertex [svi, sti, sni] = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, readMaybe sni) --
           vertex indices         = Left  $ "Face vertex with too many indices: " ++ show indices         --
+          texture [sx, sy] = sequence (map readEither [sx, sy]) >>= \ [x, y] -> Right $ OBJTexture x y   -- TOOD: Refactor
+          texture  _       = Left $ "Texture token with the wrong number of coordinates: " ++ show values 
 
 
 -- MTL parsing ------------------------------------------------------------------------------------
