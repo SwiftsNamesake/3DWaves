@@ -81,9 +81,9 @@ rows = filter (not . satisfiesAny [null, isComment]) . lines
 -- TODO: More informative error message (?)
 -- TODO: Rename (?)
 -- TODO: Generic function for mapping and sequencing readEither (cf. "vt" case in parseOBJRow) (?)
-vector :: Read r => ([r] -> b) -> [String] -> Either String b
-vector f coords = sequence (map readEither coords) >>= Right . f
-vector _ _      = Left  $ "Wrong number of coordinates for vector"
+vector :: Read r => (r -> r -> r -> b) -> [String] -> Either String b
+vector token [sx,sy,sz] = sequence (map readEither [sx,sy,sz]) >>= \ [x,y,z] -> Right $ token x y z
+vector _      _         = Left  $ "Wrong number of coordinates for vector"
 
 
 -- |
