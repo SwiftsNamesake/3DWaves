@@ -125,9 +125,9 @@ type OBJ = [(Int, Either String OBJToken, String)]
 -- TODO: Is the alpha channel optional, ignored, disallowed?
 -- TODO: Include support for ('Ns', 'Ni', 'd', 'Tr', 'illum')
 -- 
-data MTLToken = Ambient  Float Float Float Float | -- Ka
-                Diffuse  Float Float Float Float | -- Kd
-                Specular Float Float Float Float | -- Ks
+data MTLToken = Ambient  Float Float Float (Maybe Float) | -- Ka
+                Diffuse  Float Float Float (Maybe Float) | -- Kd
+                Specular Float Float Float (Maybe Float) | -- Ks
 
         MapDiffuse  String | -- map_Kd
         NewMaterial String   -- newmtl
@@ -215,7 +215,10 @@ parseOBJ = enumerate . map parseOBJRow . lines -- . rows
 -- TODO: Rename 'which' (?)
 -- TODO: Handle invalid rows (how to deal with mangled definitions w.r.t indices?)
 -- TODO: Extract value parsing logic (eg. pattern matching, converting, handle errors)
+
 -- TODO: Named errors (typed?) rather than Nothing (cf. Either) (?)
+--       Type for unsupported but valid (according to spec) attributes (?)
+--
 -- TODO: Additional values, currently unsupported attributes (ignore?) (pattern match against the entire line, eg. ["vn", x, y, z])
 -- TODO: Dealing with MTL definitions (pass in names, MTL value, return list of MTL dependencies)
 -- TODO: Take 1-based indexing into account straight away (?)
@@ -225,20 +228,20 @@ parseOBJ = enumerate . map parseOBJRow . lines -- . rows
 --
 parseOBJRow :: String -> OBJRow -- Maybe OBJToken
 parseOBJRow ln = withoutComment ln $ \ tokens -> let (which:values) = words tokens in case which of
-    "v"  -> vector OBJVertex values -- Vertex
-    "vn" -> vector OBJNormal values -- Normal
+    "v"  -> vector (\ [x,y,z] -> OBJVertex x y z) values -- Vertex
+    "vn" -> vector (\ [x,y,z] -> OBJNormal x y z) values -- Normal
     "vt" -> texture values -- Texture
-    "f"  -> either (Left . const ln) (Right . OBJFace) . sequence . map (vertex . cuts '/') $ values -- Face
+    "f"  -> either (Left . const ln) (Right . OBJFace) . sequence . map (ivertex . cuts '/') $ values -- Face
     "g"  -> Right . Group  $ values -- Group
     "o"  -> Right . Object $ values -- Object
     "s"  -> Left ln                 -- Smooth shading
     "mtllib" -> Right . LibMTL $ head values --
     "usemtl" -> Right . UseMTL $ head values --
     _        -> Left ln -- TODO More informative errors
-    where vertex [svi, sti, sni] = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, readMaybe sni) --
-          vertex indices         = Left  $ "Face vertex with too many indices: " ++ show indices         --
-          texture [sx, sy] = sequence (map readEither [sx, sy]) >>= \ [x, y] -> Right $ OBJTexture x y   -- TOOD: Refactor
-          texture values   = Left $ "Texture token with the wrong number of coordinates: " ++ show values 
+    where ivertex [svi, sti, sni] = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, readMaybe sni) -- TODO: Refactor, simplify
+          ivertex indices         = Left  $ "Face vertex with too many indices: " ++ show indices         --
+          texture coords@[sx, sy] = vector (\ [x, y] -> OBJTexture x y) coords                            -- TOOD: Refactor
+          texture values   = Left $ "Texture token with the wrong number of coordinates: " ++ show values -- 
 
 
 -- MTL parsing ------------------------------------------------------------------------------------
@@ -249,8 +252,11 @@ parseMTL = enumerate . map parseMTLRow . lines
 
 
 -- | 
--- process the MTL tokens
+--
+-- TOOD: Simplify 'withChannels' 
+-- TOOD: Process the MTL tokens (✗)
 -- TODO: cf. parseOBJRow
+--
 parseMTLRow :: String -> MTLRow
 parseMTLRow ln = withoutComment ln $ \ tokens -> let (which:values) = words tokens in case which of
     "Ka" -> withChannels Ambient  values -- Ka
@@ -259,9 +265,8 @@ parseMTLRow ln = withoutComment ln $ \ tokens -> let (which:values) = words toke
     "map_Kd" -> withName MapDiffuse values  -- map_Kd
     "newmtl" -> withName NewMaterial values -- newmtl
     _        -> Left ln
-    where withChannels token [r,g,b,a] = Right $ token (read r) (read g) (read b) (read a) --
-          withChannels token [r,g,b]   = Right $ token (read r) (read g) (read b) (1.0)    -- Alpha is 1.0 by default (use Maybe instead?)
-          withChannels _      _        = Left  $ "Pattern match failed"
+    where withChannels token (sr:sg:sb:rest)  = vector (\[r, g, b] -> token r g b $ listToMaybe rest >>= readMaybe) [sr, sg, sb] -- TODO: Refactor, simplify
+          withChannels _      _            = Left "Wrong number of colour channels"
 
           withName token (name:[]) = Right $ token name
           withName _      _        = Left  $ "Pattern match failed"
@@ -332,9 +337,9 @@ materialsOf tokens = Map.fromList . rights $ map createMaterial groups
        fromAttributes  attrs
          | any null colours = Left  $ "Missing colour(s)" -- TODO: More elaborate message (eg. which colour)
          | otherwise        = Right $ Material { ambient=head a, diffuse=head d, specular=head s, texture=listToMaybe [ name | MapDiffuse name <- attrs ] }
-         where colours@[d, s, a] = [[ (r, g, b, a) | Diffuse  r g b a <- attrs ],
-                                    [ (r, g, b, a) | Specular r g b a <- attrs ],
-                                    [ (r, g, b, a) | Ambient  r g b a <- attrs ]]
+         where colours@[d, s, a] = [[ (r, g, b, maybe 1.0 id a) | Diffuse  r g b a <- attrs ],
+                                    [ (r, g, b, maybe 1.0 id a) | Specular r g b a <- attrs ],
+                                    [ (r, g, b, maybe 1.0 id a) | Ambient  r g b a <- attrs ]]
 
 
 -- |
