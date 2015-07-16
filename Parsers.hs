@@ -238,7 +238,7 @@ parseOBJRow ln = withoutComment ln $ \ tokens -> let (which:values) = words toke
     where vertex [svi, sti, sni] = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, readMaybe sni) --
           vertex indices         = Left  $ "Face vertex with too many indices: " ++ show indices         --
           texture [sx, sy] = sequence (map readEither [sx, sy]) >>= \ [x, y] -> Right $ OBJTexture x y   -- TOOD: Refactor
-          texture  _       = Left $ "Texture token with the wrong number of coordinates: " ++ show values 
+          texture values   = Left $ "Texture token with the wrong number of coordinates: " ++ show values 
 
 
 -- MTL parsing ------------------------------------------------------------------------------------

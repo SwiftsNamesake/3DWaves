@@ -27,6 +27,7 @@ module Southpaw.WaveFront.Utilities where
 ---------------------------------------------------------------------------------------------------
 import Data.List (isPrefixOf)
 import Data.Char (isSpace)
+import Text.Read (readEither)
 
 
 
@@ -79,9 +80,10 @@ rows = filter (not . satisfiesAny [null, isComment]) . lines
 -- TODO: Variadic 'unpacking' (or is that sinful?)
 -- TODO: More informative error message (?)
 -- TODO: Rename (?)
+-- TODO: Generic function for mapping and sequencing readEither (cf. "vt" case in parseOBJRow) (?)
 vector :: Read r => (r -> r -> r -> b) -> [String] -> Either String b
-vector token (x:y:z:[]) = Right $ token (read x) (read y) (read z) -- TODO: Add back the Maybe wrapper (?)
-vector _      _         = Left  $ "Pattern match failed"
+vector token [sx,sy,sz] = sequence (map readEither [sx,sy,sz]) >>= \ [x,y,z] -> Right $ token x y z
+vector _      _         = Left  $ "Wrong number of coordinates for vector"
 
 
 -- |
