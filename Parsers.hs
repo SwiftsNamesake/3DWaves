@@ -228,11 +228,6 @@ parseOBJRow ln = withoutComment ln $ \ tokens -> let (which:values) = words toke
     "v"  -> vector OBJVertex values -- Vertex
     "vn" -> vector OBJNormal values -- Normal
     "vt" -> texture values -- Texture
-    -- TODO: Clean this up (✓)
-    -- TODO: Handle invalid data (✓)
-    -- TODO: Capture invalid vertex definitions (cf. sequence) (✓)
-    -- TODO: Deal with missing indices some other way (reflect it in the output somehow, using the Either type?) (✓)
-    -- TODO: More generic way of unpacking the right number of values and applying read (?)
     "f"  -> either (Left . const ln) (Right . OBJFace) . sequence . map (vertex . cuts '/') $ values -- Face
     "g"  -> Right . Group  $ values -- Group
     "o"  -> Right . Object $ values -- Object
