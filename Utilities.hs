@@ -30,11 +30,17 @@ import Data.Char (isSpace)
 import Text.Read (readEither)
 
 
-
 ---------------------------------------------------------------------------------------------------
 -- Functions
 ---------------------------------------------------------------------------------------------------
 -- Parsing utilities ------------------------------------------------------------------------------
+-- |
+parseTokenWith :: String -> ([String] -> Either String a) -> (Either String a, String)
+parseTokenWith ln parse
+  | null ln || isComment ln = withoutComment ln $ Left
+  | otherwise               = withoutComment ln $ parse . words
+
+
 -- | Predicate for determining if a String is a comment. Comments are preceded by a '#' and any
 --   number of whitespace characters (not including linebreaks). Support for comments at the end
 --   of a line has yet to be added.

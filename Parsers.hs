@@ -14,8 +14,11 @@
 --        - Grammar specification
 --        - Incremental parsing (?)
 --        - Improve naming scheme
+--
 --        - Separate MTL and OBJ parsers (?) (...)
---        - Separate parsing, IO and testing (...)
+--        - Separate parsing, processing, logging, IO and testing (...)
+--          -- Proper path handling (eg. include root in MTLTable or not)
+--
 --        - Additional attributes (lighting, splines, etc.)
 --        - FFI (...)
 --        - Debugging information (line number, missing file, missing values, etc.) (...)
@@ -23,17 +26,23 @@
 --        - Model type (...)
 --        - Caching (?)
 --        - Performance, profiling, optimisations
+--          -- Strict or lazy (eg. with Data.Map) (?)
+--
 --        - PrintfArg instances for the types defined in this module
 --        - Reconciling Cabal and hierarchical modules
 --        - Dealing with paths in lib statements (requires knowledge of working directories)
 --        - Move comments and specification to separate files (eg. README)
 --        - Inline comments (for internals, implementation)
 --
+--        - Full OBJ spec compliance
+--          -- Do the usemtl and libmtl statements affect vertices or faces (?)
+--
 --        - Parser bugs
 --          -- Negative coordinates enclosed in parentheses
 --
 --        - Decide on a public interface (exports) (API)
 --          -- Model will be the main API type
+--          -- Processing utils (eg. iterating over model faces; withModelFaces :: ((Material, [(Vertex, Maybe Normalcoords, Maybe Texcoords)]) -> b) -> Model -> [b])
 --          -- Export functions for working with the output data (eg. unzipIndices :: [(Int, Int, Int)] -> ([Int], [Int], [Int]))
 --          -- Export certain utilities (eg. second, perhaps in another module) (?)
 
@@ -56,7 +65,8 @@
 module Southpaw.WaveFront.Parsers (parseOBJ, parseMTL,
                                    loadOBJ, loadMTL,
                                    loadModel,
-                                   MTL(), OBJ(), Model(..), Face(..),
+                                   facesOf,
+                                   MTL(), OBJ(), Model(..), Face(..), Material(..), OBJToken(..), MTLToken(..),
                                    createModel) where
 
 
@@ -68,17 +78,19 @@ import Data.List   (groupBy)
 import Data.Maybe  (listToMaybe)
 import Data.Either (rights, isLeft)
 
-import Text.Printf (printf)
 import Text.Read   (readMaybe, readEither)
-
-import System.IO     (hFlush, stdout)
-import Control.Monad (forM_)
--- import Control.Concurrent (threadDelay)
 
 import Southpaw.Utilities.Utilities (pairwise, cuts)
 import Southpaw.WaveFront.Utilities
 
 import qualified Data.Map as Map
+
+import System.FilePath (splitFileName, (</>))
+import Control.Monad   (forM_)
+
+-- import Control.Concurrent (threadDelay)
+import Text.Printf (printf)
+import System.IO   (hFlush, stdout)
 
 
 
@@ -100,8 +112,8 @@ data OBJToken = OBJVertex  Float Float Float          |
                 UseMTL String | --  
                 LibMTL String | -- TODO: Use actual MTL type
 
-                Group  [String] | -- TODO: Do grouped faces have to be consecutive?
-                Object [String]   -- TODO: What is the difference between group and object?
+                Group  [String] |   -- TODO: Do grouped faces have to be consecutive?
+                Object [String]     -- TODO: What is the difference between group and object?
                 deriving (Eq, Show) -- TODO: Derive Read (?)
 
 
@@ -186,7 +198,7 @@ data Model = Model { vertices  :: [Vector Float],
                      normals   :: [Vector Float],
                      textures  :: [Point  Float],
                      faces     :: [Face],
-                     materials :: Map.Map String (Map.Map String Material), -- TODO: Type synonym (?)
+                     materials :: MTLTable, -- TODO: Type synonym (?)
                      groups    :: Map.Map [String] (Int, Int), -- TODO: Type synonym
                      objects   :: Map.Map [String] (Int, Int)  -- TODO: Type synonym
                    } deriving (Show)
@@ -211,37 +223,40 @@ parseOBJ = enumerate . map parseOBJRow . lines -- . rows
 
 -- | Generates a token given a single valid OBJ row, or an error value if the input is malformed. 
 --
--- TODO: Correctness (complete function, no runtime exceptions)
+-- TODO: Correctness (total function, no runtime exceptions)
 -- TODO: Rename 'which' (?)
 -- TODO: Handle invalid rows (how to deal with mangled definitions w.r.t indices?)
 -- TODO: Extract value parsing logic (eg. pattern matching, converting, handle errors)
 
 -- TODO: Named errors (typed?) rather than Nothing (cf. Either) (?)
 --       Type for unsupported but valid (according to spec) attributes (?)
+--       Type for specific attribute that failed to parse (eg. "f 1/2 0/p 1.5/x")
 --
 -- TODO: Additional values, currently unsupported attributes (ignore?) (pattern match against the entire line, eg. ["vn", x, y, z])
 -- TODO: Dealing with MTL definitions (pass in names, MTL value, return list of MTL dependencies)
 -- TODO: Take 1-based indexing into account straight away (?)
 -- TODO: Deal with absent texture and normal indices
 -- TODO: Strip trailing comments (✓)
--- TODO: Don't ignore leftover values (errors?)
+-- TODO: Don't ignore leftover values (errors?) (...)
 --
 parseOBJRow :: String -> OBJRow -- Maybe OBJToken
-parseOBJRow ln = withoutComment ln $ \ tokens -> let (which:values) = words tokens in case which of
-    "v"  -> vector (\ [x,y,z] -> OBJVertex x y z) values -- Vertex
-    "vn" -> vector (\ [x,y,z] -> OBJNormal x y z) values -- Normal
-    "vt" -> texture values -- Texture
-    "f"  -> either (Left . const ln) (Right . OBJFace) . sequence . map (ivertex . cuts '/') $ values -- Face
-    "g"  -> Right . Group  $ values -- Group
-    "o"  -> Right . Object $ values -- Object
-    "s"  -> Left ln                 -- Smooth shading
-    "mtllib" -> Right . LibMTL $ head values --
-    "usemtl" -> Right . UseMTL $ head values --
-    _        -> Left ln -- TODO More informative errors
+parseOBJRow ln = parseTokenWith ln $ \ (which:values) -> case which:values of
+    ["v",  _, _, _]  -> withXYZ OBJVertex values -- Vertex
+    ["vn", _, _, _]  -> withXYZ OBJNormal values -- Normal
+    ["vt", _, _]     -> withXY values            -- Texture
+    ("f":_:_:_:_)    -> either (Left . const ln) (Right . OBJFace) . sequence . map (ivertex . cuts '/') $ values -- Face
+    ("g":_)          -> Right . Group  $ values -- Group
+    ("o":_)          -> Right . Object $ values -- Object
+    ("s":_)          -> Left ln                 -- Smooth shading
+    ["mtllib", lib]  -> Right . LibMTL $ lib    --
+    ["usemtl", mtl]  -> Right . UseMTL $ mtl    --
+    _                -> Left ln                 -- TODO More informative errors
     where ivertex [svi, sti, sni] = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, readMaybe sni) -- TODO: Refactor, simplify
-          ivertex indices         = Left  $ "Face vertex with too many indices: " ++ show indices         --
-          texture coords@[_, _] = vector (\ [x, y] -> OBJTexture x y) coords                            -- TOOD: Refactor
-          texture values   = Left $ "Texture token with the wrong number of coordinates: " ++ show values -- 
+          ivertex is              = Left  $ "Face vertex with too many indices: " ++ show is              --
+          withXY f [sx, sy] = vector (\ [x, y] -> f x y) [sx, sy]                     
+          withXY _ values   = Left $ "Wrong number of coordinates (expected two): " ++ show values -- 
+          withXYZ f [sx, sy, sz] = vector (\ [x, y, z] -> f x y z) [sx,sy,sz]
+          withXYZ _ values       = Left $ "Wrong number of coordinates (expected three): " ++ show values
 
 
 -- MTL parsing ------------------------------------------------------------------------------------
@@ -258,7 +273,7 @@ parseMTL = enumerate . map parseMTLRow . lines
 -- TODO: cf. parseOBJRow
 --
 parseMTLRow :: String -> MTLRow
-parseMTLRow ln = withoutComment ln $ \ tokens -> let (which:values) = words tokens in case which of
+parseMTLRow ln = parseTokenWith ln $ \ (which:values) -> case which of
     "Ka" -> withChannels Ambient  values -- Ka
     "Kd" -> withChannels Diffuse  values -- Kd
     "Ks" -> withChannels Specular values -- Ks
@@ -302,14 +317,17 @@ buildIndexMapWith tokens = Map.fromList . pairwise zipIndices . reverse . addLas
           _             -> (nfaces,   groups')
 
 
--- |
+-- | Filters out faces from a stream of OBJTokens and attaches the currently selected material,
+--   as defined by the most recent LibMTL and UseMTL tokens.
 -- 
 -- TODO: Don't use foldl (?)
 -- TODO: Deal with errors (eg. missing materials)
 -- TODO: Improve naming scheme (lots of primes)
+-- TODO: Default material, take 'error-handling' function (?)
+--
 facesOf :: [OBJToken] -> MTLTable -> [Either String Face]
-facesOf tokens materials = reverse . third . foldl update ("", "", []) $ tokens
-  where retrieve lib mat       = Map.lookup lib materials >>= Map.lookup mat
+facesOf tokens table = reverse . third . foldl update ("", "", []) $ tokens
+  where retrieve lib mat       = Map.lookup lib table >>= Map.lookup mat
         createFace lib mat ind = case retrieve lib mat of
                                    Nothing -> Left  $ "No such material: " ++ lib ++ "." ++ mat
                                    Just m  -> Right $ Face { indices=ind, material=m }
@@ -317,6 +335,7 @@ facesOf tokens materials = reverse . third . foldl update ("", "", []) $ tokens
                                                    OBJFace ind -> (lib', material', createFace lib' material' ind : faces')
                                                    LibMTL  lib -> (lib,  material', faces')
                                                    UseMTL  mat -> (lib', mat,       faces')
+                                                   _           -> (lib', material', faces')
 
 
 -- Parser output churners (MTL) -------------------------------------------------------------------
@@ -329,17 +348,17 @@ facesOf tokens materials = reverse . third . foldl update ("", "", []) $ tokens
 -- TOOD: Deal with duplicated attributes (probably won't crop up in any real situations)
 materialsOf :: [MTLToken] -> Map.Map String (Either String Material)
 materialsOf tokens = Map.fromList . rights $ map createMaterial groups
- where groups = groupBy (const . isnew) tokens
+ where groups = groupBy (\ _ b -> not $ isnew b) tokens
        isnew (NewMaterial _) = True  -- TODO: Rename isnew
        isnew  _              = False
        createMaterial (NewMaterial name:attrs) = Right $ (name, fromAttributes attrs)
        createMaterial  attrs                   = Left  $ "Free-floating attributes: " ++ show attrs
        fromAttributes  attrs
          | any null colours = Left  $ "Missing colour(s)" -- TODO: More elaborate message (eg. which colour)
-         | otherwise        = Right $ Material { ambient=head a, diffuse=head d, specular=head s, texture=listToMaybe [ name | MapDiffuse name <- attrs ] }
-         where colours@[d, s, a] = [[ (r, g, b, maybe 1.0 id a) | Diffuse  r g b a <- attrs ],
-                                    [ (r, g, b, maybe 1.0 id a) | Specular r g b a <- attrs ],
-                                    [ (r, g, b, maybe 1.0 id a) | Ambient  r g b a <- attrs ]]
+         | otherwise        = Right $ Material { ambient=head amb, diffuse=head diff, specular=head spec, texture=listToMaybe [ name | MapDiffuse name <- attrs ] }
+         where colours@[diff, spec, amb] = [[ (r, g, b, maybe 1.0 id a) | Diffuse  r g b a <- attrs ],
+                                            [ (r, g, b, maybe 1.0 id a) | Specular r g b a <- attrs ],
+                                            [ (r, g, b, maybe 1.0 id a) | Ambient  r g b a <- attrs ]]
 
 
 -- |
@@ -349,6 +368,7 @@ createMTLTable :: [(String, [MTLToken])] -> MTLTable
 createMTLTable mtls = Map.fromList . map (\ (name, tokens) -> (name, Map.mapMaybe prune . materialsOf $ tokens)) $ mtls
   where prune (Right mat) = Just mat
         prune (Left  _)   = Nothing
+
 
 -- API functions ----------------------------------------------------------------------------------
 -- | 
@@ -375,7 +395,6 @@ createModel tokens materials = let modeldata  = rights $ map second tokens -- TO
                                           groups    = groupsOf  modeldata,
                                           objects   = objectsOf modeldata,
                                           materials = materials } 
-
 
 
 ---------------------------------------------------------------------------------------------------
@@ -406,10 +425,11 @@ loadMTL fn = do
 -- |
 -- TODO: Better names (than 'mtls' and 'fns') (?)
 -- TODO: Refactor, simplify
+-- TODO: Improve path handling (cf. '</>')
 loadMaterials :: [String] -> IO MTLTable
 loadMaterials fns = do
   mtls <- mapM loadMTL fns --
-  return . createMTLTable . zip fns . map tokensOf $ mtls
+  return . createMTLTable . zip (map (snd . splitFileName) fns) . map tokensOf $ mtls --
   where tokensOf = rights . map second
 
 
@@ -418,9 +438,9 @@ loadMaterials fns = do
 loadModel :: String -> IO Model
 loadModel fn = do
   obj       <- loadOBJ fn
-  materials <- loadMaterials [ name | LibMTL name <- rights $ map second obj ]
+  materials <- loadMaterials [ (fst $ splitFileName fn) </> name | LibMTL name <- rights $ map second obj ]
   return $ createModel obj materials
-  where loadWithName name = loadMTL name >>= return . (name,) 
+  where loadWithName name = loadMTL name >>= return . (name,)
 
 
 -- General utilities ------------------------------------------------------------------------------
