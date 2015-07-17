@@ -241,22 +241,22 @@ parseOBJ = enumerate . map parseOBJRow . lines -- . rows
 --
 parseOBJRow :: String -> OBJRow -- Maybe OBJToken
 parseOBJRow ln = parseTokenWith ln $ \ (which:values) -> case which:values of
-    ["v",  _, _, _]  -> withXYZ OBJVertex values -- Vertex
-    ["vn", _, _, _]  -> withXYZ OBJNormal values -- Normal
-    ["vt", _, _]     -> withXY values            -- Texture
     ("f":_:_:_:_)    -> either (Left . const ln) (Right . OBJFace) . sequence . map (ivertex . cuts '/') $ values -- Face
-    ("g":_)          -> Right . Group  $ values -- Group
-    ("o":_)          -> Right . Object $ values -- Object
-    ("s":_)          -> Left ln                 -- Smooth shading
-    ["mtllib", lib]  -> Right . LibMTL $ lib    --
-    ["usemtl", mtl]  -> Right . UseMTL $ mtl    --
-    _                -> Left ln                 -- TODO More informative errors
+    ["v",  _, _, _]  -> withXYZ OBJVertex  values -- Vertex
+    ["vn", _, _, _]  -> withXYZ OBJNormal  values -- Normal
+    ["vt", _, _]     -> withXY  OBJTexture values -- Texture
+    ("g":_)          -> Right . Group  $ values   -- Group
+    ("o":_)          -> Right . Object $ values   -- Object
+    ("s":_)          -> Left ln                   -- Smooth shading
+    ["mtllib", lib]  -> Right . LibMTL $ lib      --
+    ["usemtl", mtl]  -> Right . UseMTL $ mtl      --
+    _                -> Left ln                   -- TODO More informative errors
     where ivertex [svi, sti, sni] = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, readMaybe sni) -- TODO: Refactor, simplify
           ivertex is              = Left  $ "Face vertex with too many indices: " ++ show is              --
-          withXY f [sx, sy] = vector (\ [x, y] -> f x y) [sx, sy]                     
-          withXY _ values   = Left $ "Wrong number of coordinates (expected two): " ++ show values -- 
-          withXYZ f [sx, sy, sz] = vector (\ [x, y, z] -> f x y z) [sx,sy,sz]
-          withXYZ _ values       = Left $ "Wrong number of coordinates (expected three): " ++ show values
+          withXY f [sx, sy] = vector (\ [x, y] -> f x y) [sx, sy]                                         --
+          withXY _ values   = Left $ "Wrong number of coordinates (expected two): " ++ show values        -- 
+          withXYZ f [sx, sy, sz] = vector (\ [x, y, z] -> f x y z) [sx,sy,sz]                             --
+          withXYZ _ values       = Left $ "Wrong number of coordinates (expected three): " ++ show values --
 
 
 -- MTL parsing ------------------------------------------------------------------------------------
