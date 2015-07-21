@@ -63,9 +63,8 @@
 -- Section
 ---------------------------------------------------------------------------------------------------
 module Southpaw.WaveFront.Parsers (parseOBJ, parseMTL,
-                                   loadOBJ, loadMTL,
-                                   loadModel,
-                                   facesOf,
+                                   loadOBJ,  loadMTL, loadModel,
+                                   facesOf,  materialsOf,
                                    MTL(), OBJ(), Model(..), Face(..), Material(..), OBJToken(..), MTLToken(..),
                                    createModel) where
 
@@ -240,51 +239,44 @@ parseOBJ = enumerate . map parseOBJRow . lines -- . rows
 -- TODO: Don't ignore leftover values (errors?) (...)
 --
 parseOBJRow :: String -> OBJRow -- Maybe OBJToken
-parseOBJRow ln = parseTokenWith ln $ \ (which:values) -> case which:values of
-    ("f":_:_:_:_)    -> either (Left . const ln) (Right . OBJFace) . sequence . map (ivertex . cuts '/') $ values -- Face
-    ["v",  _, _, _]  -> withXYZ OBJVertex  values -- Vertex
-    ["vn", _, _, _]  -> withXYZ OBJNormal  values -- Normal
-    ["vt", _, _]     -> withXY  OBJTexture values -- Texture
-    ("g":_)          -> Right . Group  $ values   -- Group
-    ("o":_)          -> Right . Object $ values   -- Object
-    ("s":_)          -> Left ln                   -- Smooth shading
-    ["mtllib", lib]  -> Right . LibMTL $ lib      --
-    ["usemtl", mtl]  -> Right . UseMTL $ mtl      --
-    _                -> Left ln                   -- TODO More informative errors
+parseOBJRow ln = parseTokenWith ln $ \ (attr:values) -> case attr:values of
+    ("f":_:_:_:_)      -> either (Left . const ln) (Right . OBJFace) . sequence . map (ivertex . cuts '/') $ values -- Face
+    ["v",  sx, sy, sz] -> vector (\ [x, y, z] -> OBJVertex  x y z) [sx, sy, sz] -- Vertex
+    ["vn", sx, sy, sz] -> vector (\ [x, y, z] -> OBJNormal  x y z) [sx, sy, sz] -- Normal
+    ["vt", sx, sy]     -> vector (\ [x, y]    -> OBJTexture x y)   [sx, sy]     -- Texture
+    ("g":_)            -> Right . Group  $ values                               -- Group
+    ("o":_)            -> Right . Object $ values                               -- Object
+    ("s":_)            -> Left ln                                               -- Smooth shading
+    ["mtllib", lib]    -> Right . LibMTL $ lib                                  --
+    ["usemtl", mtl]    -> Right . UseMTL $ mtl                                  --
+    _                  -> Left ln                                               -- TODO More informative errors
     where ivertex [svi, sti, sni] = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, readMaybe sni) -- TODO: Refactor, simplify
-          ivertex is              = Left  $ "Face vertex with too many indices: " ++ show is              --
-          withXY f [sx, sy] = vector (\ [x, y] -> f x y) [sx, sy]                                         --
-          withXY _ values   = Left $ "Wrong number of coordinates (expected two): " ++ show values        -- 
-          withXYZ f [sx, sy, sz] = vector (\ [x, y, z] -> f x y z) [sx,sy,sz]                             --
-          withXYZ _ values       = Left $ "Wrong number of coordinates (expected three): " ++ show values --
+          ivertex is              = Left  $ "Face vertex with too many indices: " ++ show is              -- This value will simply be discarded by the "f" case
 
 
 -- MTL parsing ------------------------------------------------------------------------------------
--- |
--- process the OBJ tokens
+-- | Produces a list of MTL tokens, with associated line numbers and comments
 parseMTL :: String -> MTL
 parseMTL = enumerate . map parseMTLRow . lines
 
 
--- | 
+-- | Parses a single MTL row.
 --
 -- TOOD: Simplify 'withChannels' 
 -- TOOD: Process the MTL tokens (✗)
 -- TODO: cf. parseOBJRow
 --
 parseMTLRow :: String -> MTLRow
-parseMTLRow ln = parseTokenWith ln $ \ (which:values) -> case which of
-    "Ka" -> withChannels Ambient  values -- Ka
-    "Kd" -> withChannels Diffuse  values -- Kd
-    "Ks" -> withChannels Specular values -- Ks
-    "map_Kd" -> withName MapDiffuse values  -- map_Kd
-    "newmtl" -> withName NewMaterial values -- newmtl
-    _        -> Left ln
-    where withChannels token (sr:sg:sb:rest) = vector (\[r, g, b] -> token r g b $ listToMaybe rest >>= readMaybe) [sr, sg, sb] -- TODO: Refactor, simplify
-          withChannels _      _              = Left "Wrong number of colour channels"
-
-          withName token [name] = Right $ token name
-          withName _      _     = Left  $ "Wrong number of names"
+parseMTLRow ln = parseTokenWith ln $ \ (which:values) -> case which:values of
+    ("Ka":sr:sg:sb:rest) -> withChannels Ambient  sr sg sb rest -- Ka
+    ("Kd":sr:sg:sb:rest) -> withChannels Diffuse  sr sg sb rest -- Kd
+    ("Ks":sr:sg:sb:rest) -> withChannels Specular sr sg sb rest -- Ks
+    ["map_Kd", name]     -> Right $ MapDiffuse  name            -- map_Kd
+    ["newmtl", name]     -> Right $ NewMaterial name            -- newmtl
+    _                    -> Left ln                             -- 
+    where withChannels f sr sg sb []   = vector (\[r, g, b] -> f r g b Nothing) [sr, sg, sb]        -- TODO: Refactor, simplify
+          withChannels f sr sg sb [sa] = vector (\[r, g, b] -> f r g b $ readMaybe sa) [sr, sg, sb] -- TODO: Refactor, simplify
+          withChannels _ _  _  _   _   = Left "Wrong number of colour channels"
 
 
 -- Parser output churners (OBJ) -------------------------------------------------------------------
@@ -306,6 +298,9 @@ objectsOf = buildIndexMapWith . filter notGroup
 
 
 -- | Creates a mapping between names (of groups or objects) to face indices
+--
+-- TODO: Refactor, simplify
+--
 buildIndexMapWith :: [OBJToken] -> Map.Map [String] (Int, Int)
 buildIndexMapWith tokens = Map.fromList . pairwise zipIndices . reverse . addLastIndex $ foldl update (0, []) $ tokens
   where addLastIndex (nfaces, groups') = ([], nfaces):groups'
@@ -348,7 +343,7 @@ facesOf tokens table = reverse . third . foldl update ("", "", []) $ tokens
 -- TOOD: Deal with duplicated attributes (probably won't crop up in any real situations)
 materialsOf :: [MTLToken] -> Map.Map String (Either String Material)
 materialsOf tokens = Map.fromList . rights $ map createMaterial groups
- where groups = groupBy (\ _ b -> not $ isnew b) tokens
+ where groups = groupBy (((not . isnew) .) . flip const) tokens -- TODO: Refactor this atrocity
        isnew (NewMaterial _) = True  -- TODO: Rename isnew
        isnew  _              = False
        createMaterial (NewMaterial name:attrs) = Right $ (name, fromAttributes attrs)
@@ -394,7 +389,7 @@ createModel tokens materials = let modeldata  = rights $ map second tokens -- TO
                                           faces     = rights $ facesOf modeldata materials,
                                           groups    = groupsOf  modeldata,
                                           objects   = objectsOf modeldata,
-                                          materials = materials } 
+                                          materials = materials }
 
 
 ---------------------------------------------------------------------------------------------------
@@ -441,50 +436,3 @@ loadModel fn = do
   materials <- loadMaterials [ (fst $ splitFileName fn) </> name | LibMTL name <- rights $ map second obj ]
   return $ createModel obj materials
   where loadWithName name = loadMTL name >>= return . (name,)
-
-
--- General utilities ------------------------------------------------------------------------------
--- | Counts the number of elements that satisfy the predicate
-count :: (a -> Bool) -> [a] -> Int
-count p = length . filter p
-
-
-
--- IO utilities -----------------------------------------------------------------------------------
--- | 
-promptContinue :: String -> IO ()
-promptContinue prompt = do
-  putStr prompt
-  hFlush stdout
-  getChar
-  putChar '\n'
-
-
-
----------------------------------------------------------------------------------------------------
--- Entry point
----------------------------------------------------------------------------------------------------
-main :: IO ()
-main = do
-  putStrLn "This is where the checks should be."
-
-  let path = "C:/Users/Jonatan/Desktop/Python/experiments/WaveFront/"
-  
-  forM_ ["queen", "cube"] $ \ fn -> do
-    printf "\nParsing OBJ file: %s.obj\n" fn
-    model <- loadOBJ $ printf (path ++ "data/%s.obj") fn
-    printf "Found %d invalid rows in OBJ file (m comments, n blanks, o errors).\n" (count isLeft $ map second model)
-
-    promptContinue "Press any key to continue..."
-
-    mapM_ print ["[" ++ show n ++ "] " ++ show token | (n, Right token, comment) <- model ]
-    -- TODO: Print culprit lines (✓)
-
-    promptContinue "Press any key to continue..."
-
-    printf "\nParsing MTL file: %s.mtl\n" fn
-    materials <- loadMTL $ printf (path ++ "data/%s.mtl") fn
-    printf "Found %d invalid rows in MTL file (m comments, n blanks, o errors).\n" (count isLeft $ map second materials)
-    mapM_ print ["[" ++ show n ++ "] " ++ show token | (n, Right token, comment) <- materials ]
-
-    promptContinue "Press any key to continue..."

@@ -1,13 +1,14 @@
 --
--- Wavefront - checks.hs
+-- Southpaw.Wavefront.Checks
 -- Executable containing checks and tests for the modules in this package
 --
 -- Jonatan H Sundqvist
 -- February 24 2015
 --
 
--- TODO | -
---        -
+-- TODO | - Use QuickCheck (?)
+--        - Full coverage
+--        - Benchmarking
 
 -- SPEC | -
 --        -
@@ -42,6 +43,7 @@ promptContinue prompt = do
   hFlush stdout
   getChar
   putChar '\n'
+
 
 
 -- | 
@@ -88,7 +90,7 @@ main = do
   putStrLn "This is where the checks should be."
 
   let path = "C:/Users/Jonatan/Desktop/Python/experiments/WaveFront/"
-  
+
   forM_ ["queen", "cube"] $ \ fn -> do
     printf "\nParsing OBJ file: %s.obj\n" fn
     model <- loadOBJ $ printf (path ++ "data/%s.obj") fn
@@ -106,6 +108,7 @@ main = do
     promptContinue "Press any key to continue..."
 
     mapM (uncurry $ printf "[%d] %s\n") [ (n, show token) | (n, Right token, comment) <- model ]
+    -- TODO: Print culprit lines (✓)
 
     promptContinue "Press any key to continue..."
 

@@ -26,7 +26,7 @@ module Southpaw.WaveFront.SampleApp where
 -- We'll need these
 ---------------------------------------------------------------------------------------------------
 import Graphics.Rendering.OpenGL
-import Graphics.UI.GLUT
+import Graphics.UI.GLFW
 
 import System.FilePath (splitFileName, (</>))
 
@@ -47,15 +47,16 @@ import Southpaw.Utilities.Utilities (numeral)
 ---------------------------------------------------------------------------------------------------
 -- Types
 ---------------------------------------------------------------------------------------------------
+-- | 
 type Buffers  = [(Normal3 GLfloat, WF.Material, [Vertex3 GLfloat])]
-data AppState = AppState { _rotation :: (GLint, GLint), _mouse :: Maybe (GLint, GLint) } deriving (Show)
+data AppState = AppState { _rotation :: (GLint, GLint), _mouse :: Maybe (GLint, GLint), _clientsize :: (GLint, GLint) } deriving (Show)
 
 
 
 ---------------------------------------------------------------------------------------------------
 -- Functions
 ---------------------------------------------------------------------------------------------------
--- |
+-- | 
 initOpenGL :: IO ()
 initOpenGL = do
 	diffuse  (Light 0) $= Color4  1.0 1.0 1.0 1.0
@@ -73,14 +74,16 @@ initOpenGL = do
 	lookAt (Vertex3 0.0 0.0 5.0) (Vertex3 0.0 0.0 0.0) (Vector3 0.0 1.0 0.0)
 
 	translate    ((Vector3 0.0 0.0 (-4.0)) :: Vector3 GLfloat)
-	rotate (-30)  ((Vector3 1.0 0.0   0.0)  :: Vector3 GLfloat)
-	rotate (-20) ((Vector3 0.0 0.0 1.0)    :: Vector3 GLfloat)
+	rotate (-30) ((Vector3 1.0 0.0   0.0)  :: Vector3 GLfloat)
+	rotate (-20) ((Vector3 0.0 0.0   1.0)  :: Vector3 GLfloat)
 
 	-- scale (0.05 :: GLfloat) 0.5 0.5
 
 
--- |
+-- | 
+--
 -- TODO: Simplify, refactor, better names
+--
 createBuffers :: WF.Model -> Buffers
 createBuffers model = triplets normals' (map WF.material faces') vertices'
 	where faces'     = WF.faces model
@@ -104,8 +107,8 @@ createBuffers model = triplets normals' (map WF.material faces') vertices'
 
 
 -- |
-onmousemotion :: IORef AppState -> MotionCallback
-onmousemotion stateref (Position mx my) = modifyIORef stateref $ \ state -> case state of
+onmousedrag :: IORef AppState -> MotionCallback
+onmousedrag stateref (Position mx my) = modifyIORef stateref $ \ state -> case state of
 	AppState { _mouse=Nothing }                             -> state { _mouse=Just (mx, my) }
 	AppState { _rotation=(rx, ry), _mouse=Just (mx', my') } -> state { _rotation=(rx+mx-mx', ry+my-my'), _mouse=Just (mx, my) }
 
@@ -118,24 +121,38 @@ onmouseup _        _ _  _ = return ()
 
 
 -- |
+onwindowresize :: IORef AppState -> ReshapeCallback
+onwindowresize stateref (Size cx cy) = do
+	modifyIORef stateref $ \ state -> state { _clientsize=(cx, cy) }
+	viewport $= (Position 0 0, Size cx cy)
+
+
+-- |
 render :: IORef AppState -> [Buffers] -> DisplayCallback
 render stateref buffers = do
 	--
-	(rx, ry) <- liftM _rotation . readIORef $ stateref
-	readIORef stateref >>= print
+	(rxi, ryi) <- liftM _rotation   . readIORef $ stateref
+	(cxi, cyi) <- liftM _clientsize . readIORef $ stateref
 
-	-- TODO: Refactor with preservingMatrix (?)
-	matrixMode $= Modelview 0
-	loadIdentity
-	lookAt (Vertex3 0.0 0.0 5.0) (Vertex3 0.0 0.0 0.0) (Vector3 0.0 1.0 0.0)
+	forM_ [(0, 0)] $ \ (wxi, wyi) -> do
+		--
+		viewport   $= (Position (wxi*div cxi 2) (wyi*div cyi 2), Size (div cxi 2) (div cyi 2))
+		clearColor $= Color4 (0.5*float wxi) (0.5*float wyi) (float wxi*float wyi*0.3) (1.0 :: GLfloat)
+		scissor    $= Just (Position (wxi*div cxi 2) (wyi*div cyi 2), Size (div cxi 2) (div cyi 2))
 
-	translate    ((Vector3 0.0 (-2.0) (-4.0)) :: Vector3 GLfloat)
-	rotate (360 * realToFrac rx/720) ((Vector3 0.0 1.0 0.0) :: Vector3 GLfloat)
-	rotate (360 * realToFrac ry/480) ((Vector3 1.0 0.0 0.0) :: Vector3 GLfloat)
+		-- TODO: Refactor with preservingMatrix (?)
+		matrixMode $= Modelview 0
+		loadIdentity
+		lookAt (Vertex3 0.0 0.0 5.0) (Vertex3 0.0 0.0 0.0) (Vector3 0.0 1.0 0.0)
 
-	clear [ColorBuffer, DepthBuffer]
-	forM_ buffers renderModel
-	swapBuffers
+		translate    ((Vector3 0.0 (-2.0) (-4.0)) :: Vector3 GLfloat)
+		rotate (180 * float rxi/float cxi) ((Vector3 0.0 1.0 0.0) :: Vector3 GLfloat)
+		rotate (180 * float ryi/float cyi) ((Vector3 1.0 0.0 0.0) :: Vector3 GLfloat)
+
+		clear [ColorBuffer, DepthBuffer]
+		forM_ buffers renderModel
+		swapBuffers
+	where float = realToFrac
 
 
 -- |
@@ -148,7 +165,7 @@ renderModel buffers = forM_ buffers renderFace
 
 -- | (Normal)
 --
--- TODO: Why just triangles (?
+-- TODO: Why just triangles (?)
 --
 renderFace :: (Normal3 GLfloat, WF.Material, [Vertex3 GLfloat]) -> IO ()
 renderFace (n, mat, vertices) =  renderPrimitive TriangleFan $ do color3f mat
@@ -159,6 +176,7 @@ renderFace (n, mat, vertices) =  renderPrimitive TriangleFan $ do color3f mat
 
 -- |
 showVertex (Vertex3 x y z) = show $ (show x, show y, show z)
+
 
 -- |
 showNormal (Normal3 x y z) = show $ (show x, show y, show z)
@@ -179,25 +197,29 @@ main :: IO ()
 main = do
 	--
 	let path      = "C:/Users/Jonatan/Desktop/3D/models/"
-	let modelname = "hombre.obj"
+	let modelname = "king.obj"
 	putStrLn "Loading model..."
 	model <- WF.loadModel $ path </> modelname
 	printf "Finished loading model '%s' with %d faces and %d vertices.\n" modelname (length $ WF.faces model) (length $ WF.vertices model)
 
 	--
-	getArgsAndInitialize
-	initialDisplayMode $= [DoubleBuffered, RGBMode, WithDepthBuffer]
-	initialWindowSize  $= (Size 720 480)
-	createWindow "WaveFront OBJ Sample (2015)"
+	stateref <- newIORef AppState { _rotation=(0,0), _mouse=Nothing, _clientsize=(720, 480) } --
+	(cx, cy) <- liftM _clientsize . readIORef $ stateref                                      -- Yes, I know this is stupid.
+
+	monitor <- getPrimaryMonitor
+	window  <- createWindow cx cy "WaveFront OBJ Sample (2015)" mmon mwin
+
+	initialDisplayMode $= [DoubleBuffered, RGBMode, WithDepthBuffer, Multisampling]
+	initialWindowSize  $= (Size cx cy)
 
 	putStrLn "Creating buffers..."
 	let buffers = [createBuffers model]
 
-	state <- newIORef AppState { _rotation=(0,0), _mouse=Nothing }
 
-	displayCallback  $= (render state buffers)
-	motionCallback   $= Just (onmousemotion state)
-	mouseCallback    $= Just (onmouseup state)
+	displayCallback $= (render stateref buffers)
+	motionCallback  $= Just (onmousedrag stateref)
+	mouseCallback   $= Just (onmouseup stateref)
+	reshapeCallback $= Just (onwindowresize stateref)
 	addTimerCallback (div 100 30) (animate 30)
 
 	putStrLn "Finished creating buffers."
