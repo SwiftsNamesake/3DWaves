@@ -27,10 +27,11 @@ module Southpaw.WaveFront.SampleApp where
 ---------------------------------------------------------------------------------------------------
 import Graphics.Rendering.OpenGL
 import qualified Graphics.UI.GLFW as GLFW
+import Graphics.UI.GLFW as GLFW (MouseButton(..), KeyState(..), MouseButtonState(..))
 
 import System.FilePath (splitFileName, (</>))
 
-import Control.Monad (forM_, liftM)
+import Control.Monad (forM_, liftM, unless)
 import Data.Maybe    (catMaybes)
 import Data.Either   (rights, lefts)
 import qualified Data.Map as Map
@@ -49,7 +50,7 @@ import Southpaw.Utilities.Utilities (numeral)
 ---------------------------------------------------------------------------------------------------
 -- | 
 type Buffers  = [(Normal3 GLfloat, WF.Material, [Vertex3 GLfloat])]
-data AppState = AppState { _rotation :: (GLint, GLint), _mouse :: Maybe (GLint, GLint), _clientsize :: (GLint, GLint) } deriving (Show)
+data AppState = AppState { _rotation :: (Double, Double), _mouse :: Maybe (Double, Double), _clientsize :: (Int, Int) } deriving (Show)
 
 
 
@@ -66,7 +67,11 @@ initOpenGL = do
 	-- lighting          $= Enabled --
 
 	depthFunc $= Just Lequal
-
+	
+	lineSmooth $= Enabled
+	blend      $= Enabled
+	blendFunc  $= (SrcAlpha, OneMinusSrcAlpha)
+	
 	matrixMode  $= Projection
 	perspective 40.0 1.0 1.0 10.0
 
@@ -108,39 +113,49 @@ createBuffers model = triplets normals' (map WF.material faces') vertices'
 
 -- |
 onmousedrag :: IORef AppState -> GLFW.CursorPosCallback
-onmousedrag stateref mx my = modifyIORef stateref $ \ state -> case state of
+onmousedrag stateref _ mx my = modifyIORef stateref $ \ state -> case state of
 	AppState { _mouse=Nothing }                             -> state { _mouse=Just (mx, my) }
 	AppState { _rotation=(rx, ry), _mouse=Just (mx', my') } -> state { _rotation=(rx+mx-mx', ry+my-my'), _mouse=Just (mx, my) }
 
 
--- 
+--  |
 -- TODO: Rename (?)
 -- Window -> MouseButton -> MouseButtonState -> ModifierKeys -> IO ()
-onmouseup :: IORef AppState -> GLFW.MouseButtonCallback
-onmouseup stateref _      GLFW.MouseButton'1 GLFW.Released _ = modifyIORef stateref $ \ state -> state { _mouse=Nothing }
-onmouseup stateref window GLFW.MouseButton'1 GLFW.Pressed  _ = modifyIORef stateref $ \ state -> GLFW.getCursorPos window >>= \ (mx, my) -> state { _mouse=Just (mx, my) }
-onmouseup _        _      _             _        _ = return ()
+onmousepress :: IORef AppState -> GLFW.MouseButtonCallback
+onmousepress stateref _      MouseButton'1 MouseButtonState'Released _ = modifyIORef stateref $ releasemouse
+onmousepress stateref window MouseButton'1 MouseButtonState'Pressed  _ = GLFW.getCursorPos window >>= \mouse -> modifyIORef stateref $ movemouse mouse window
+onmousepress _        _      _                  _                    _ = return ()
+
+
+-- |
+movemouse mouse window state = state { _mouse=Just mouse }
+
+
+-- |
+releasemouse state = state { _mouse=Nothing }
 
 
 -- |
 onwindowresize :: IORef AppState -> GLFW.WindowSizeCallback
-onwindowresize stateref cx cy = do
-	modifyIORef stateref $ \ state -> state { _clientsize=(cx, cy) }
-	viewport $= (Position 0 0, Size cx cy)
+onwindowresize stateref _ cx cy = do
+	modifyIORef stateref $ \ state -> state { _clientsize=(cx, cy) }     --
+	viewport $= (Position 0 0, Size (fromIntegral cx) (fromIntegral cy)) --
 
 
 -- |
 render :: IORef AppState -> [Buffers] -> GLFW.WindowRefreshCallback
-render stateref buffers _ = do
+render stateref buffers window = do
 	--
-	(rxi, ryi) <- liftM _rotation   . readIORef $ stateref
+	(rx, ry)   <- liftM _rotation   . readIORef $ stateref
 	(cxi, cyi) <- liftM _clientsize . readIORef $ stateref
 
 	forM_ [(0, 0)] $ \ (wxi, wyi) -> do
-		--
-		viewport   $= (Position (wxi*div cxi 2) (wyi*div cyi 2), Size (div cxi 2) (div cyi 2))
+		-- TODO: Clear up this horrible mess
+		let (cx, cy)   = (cint cxi, cint cyi)
+		-- let (cxd, cyd) = (float cxi, float cyi)
 		clearColor $= Color4 (0.5*float wxi) (0.5*float wyi) (float wxi*float wyi*0.3) (1.0 :: GLfloat)
-		scissor    $= Just (Position (wxi*div cxi 2) (wyi*div cyi 2), Size (div cxi 2) (div cyi 2))
+		viewport   $= (Position (wxi*div cx 2) (wyi*div cy 2), Size (div cx 2) (div cy 2))
+		scissor    $= Just (Position (wxi*div cx 2) (wyi*div cy 2), Size (div cx 2) (div cy 2))
 
 		-- TODO: Refactor with preservingMatrix (?)
 		matrixMode $= Modelview 0
@@ -148,13 +163,14 @@ render stateref buffers _ = do
 		lookAt (Vertex3 0.0 0.0 5.0) (Vertex3 0.0 0.0 0.0) (Vector3 0.0 1.0 0.0)
 
 		translate    ((Vector3 0.0 (-2.0) (-4.0)) :: Vector3 GLfloat)
-		rotate (180 * float rxi/float cxi) ((Vector3 0.0 1.0 0.0) :: Vector3 GLfloat)
-		rotate (180 * float ryi/float cyi) ((Vector3 1.0 0.0 0.0) :: Vector3 GLfloat)
+		rotate (((180.0 * (realToFrac rx/realToFrac cxi))) :: GLfloat) ((Vector3 0.0 1.0 0.0) :: Vector3 GLfloat)
+		rotate (((180.0 * (realToFrac ry/realToFrac cyi))) :: GLfloat) ((Vector3 1.0 0.0 0.0) :: Vector3 GLfloat)
 
 		clear [ColorBuffer, DepthBuffer]
 		forM_ buffers renderModel
-		GLFW.swapBuffers
-	where float = realToFrac
+		GLFW.swapBuffers window
+	where float = realToFrac   -- TODO: Whuuuuuuut (monomorphism restriction)?
+	      cint  = fromIntegral -- TODO: Ditto (?)
 
 
 -- |
@@ -185,10 +201,25 @@ showNormal (Normal3 x y z) = show $ (show x, show y, show z)
 
 
 -- | 
-animate fps = do
-	postRedisplay Nothing
-	addTimerCallback (div 1000 fps) (animate fps)
+-- animate fps = do
+	-- postRedisplay Nothing
+	-- addTimerCallback (div 1000 fps) (animate fps)
 
+
+---------------------------------------------------------------------------------------------------
+
+-- | Like maybe, except the function comes last
+perhaps :: b -> Maybe a -> (a -> b) -> b
+perhaps fallback value action = maybe fallback action value
+
+
+---------------------------------------------------------------------------------------------------
+mainloop :: GLFW.Window -> IORef AppState -> [Buffers] -> IO ()
+mainloop window stateref buffers = do
+	render stateref buffers window
+	GLFW.pollEvents
+	closing <- GLFW.windowShouldClose window
+	unless closing $ mainloop window stateref buffers
 
 
 ---------------------------------------------------------------------------------------------------
@@ -208,24 +239,28 @@ main = do
 	stateref <- newIORef AppState { _rotation=(0,0), _mouse=Nothing, _clientsize=(720, 480) } --
 	(cx, cy) <- liftM _clientsize . readIORef $ stateref                                      -- Yes, I know this is stupid.
 
-	mmonitor <- getPrimaryMonitor
-	window  <- createWindow cx cy "WaveFront OBJ Sample (2015)" mmonitor Nothing
+	GLFW.init
+	-- mmonitor <- GLFW.getPrimaryMonitor
+	mwindow  <- GLFW.createWindow cx cy "WaveFront OBJ Sample (2015)" Nothing Nothing
 
-	initialDisplayMode $= [DoubleBuffered, RGBMode, WithDepthBuffer, Multisampling]
+	perhaps (putStrLn "Failed to create window") mwindow $ \window -> do
+		-- initialDisplayMode $= [DoubleBuffered, RGBMode, WithDepthBuffer, Multisampling]
+		putStrLn "Creating buffers..."
+		let buffers = [createBuffers model]
 
-	putStrLn "Creating buffers..."
-	let buffers = [createBuffers model]
+		GLFW.setWindowRefreshCallback window $ Just (render stateref buffers)
+		GLFW.setCursorPosCallback     window $ Just (onmousedrag stateref)
+		GLFW.setMouseButtonCallback   window $ Just (onmousepress stateref)
+		GLFW.setWindowSizeCallback    window $ Just (onwindowresize stateref)
+		-- GLFW.addTimerCallback (div 100 30) (animate 30)
 
+		putStrLn "Finished creating buffers."
+		initOpenGL
 
-	setWindowRefreshCallback $ Just (render stateref buffers)
-	setCursorPosCallback     $ Just (onmousedrag stateref)
-	setMouseButtonCallback   $ Just (onmouseup stateref)
-	setWindowSizeCallback    $ Just (onwindowresize stateref)
-	addTimerCallback (div 100 30) (animate 30)
-
-	putStrLn "Finished creating buffers."
-	initOpenGL
-	mainLoop
+		-- GLFW.pollEvents -- mainLoop
+		mainloop window stateref buffers
+		GLFW.destroyWindow window
+		GLFW.terminate
 
 	putStrLn "Finished"
 	mapM_ putStrLn ["Finished painting.",
