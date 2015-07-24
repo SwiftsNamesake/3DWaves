@@ -26,7 +26,7 @@ module Southpaw.WaveFront.SampleApp where
 -- We'll need these
 ---------------------------------------------------------------------------------------------------
 import Graphics.Rendering.OpenGL
-import Graphics.UI.GLFW
+import qualified Graphics.UI.GLFW as GLFW
 
 import System.FilePath (splitFileName, (</>))
 
@@ -107,29 +107,31 @@ createBuffers model = triplets normals' (map WF.material faces') vertices'
 
 
 -- |
-onmousedrag :: IORef AppState -> MotionCallback
-onmousedrag stateref (Position mx my) = modifyIORef stateref $ \ state -> case state of
+onmousedrag :: IORef AppState -> GLFW.CursorPosCallback
+onmousedrag stateref mx my = modifyIORef stateref $ \ state -> case state of
 	AppState { _mouse=Nothing }                             -> state { _mouse=Just (mx, my) }
 	AppState { _rotation=(rx, ry), _mouse=Just (mx', my') } -> state { _rotation=(rx+mx-mx', ry+my-my'), _mouse=Just (mx, my) }
 
 
 -- 
 -- TODO: Rename (?)
-onmouseup :: IORef AppState -> MouseCallback
-onmouseup stateref _ Up _ = modifyIORef stateref $ \ state -> state { _mouse=Nothing }
-onmouseup _        _ _  _ = return ()
+-- Window -> MouseButton -> MouseButtonState -> ModifierKeys -> IO ()
+onmouseup :: IORef AppState -> GLFW.MouseButtonCallback
+onmouseup stateref _      GLFW.MouseButton'1 GLFW.Released _ = modifyIORef stateref $ \ state -> state { _mouse=Nothing }
+onmouseup stateref window GLFW.MouseButton'1 GLFW.Pressed  _ = modifyIORef stateref $ \ state -> GLFW.getCursorPos window >>= \ (mx, my) -> state { _mouse=Just (mx, my) }
+onmouseup _        _      _             _        _ = return ()
 
 
 -- |
-onwindowresize :: IORef AppState -> ReshapeCallback
-onwindowresize stateref (Size cx cy) = do
+onwindowresize :: IORef AppState -> GLFW.WindowSizeCallback
+onwindowresize stateref cx cy = do
 	modifyIORef stateref $ \ state -> state { _clientsize=(cx, cy) }
 	viewport $= (Position 0 0, Size cx cy)
 
 
 -- |
-render :: IORef AppState -> [Buffers] -> DisplayCallback
-render stateref buffers = do
+render :: IORef AppState -> [Buffers] -> GLFW.WindowRefreshCallback
+render stateref buffers _ = do
 	--
 	(rxi, ryi) <- liftM _rotation   . readIORef $ stateref
 	(cxi, cyi) <- liftM _clientsize . readIORef $ stateref
@@ -151,7 +153,7 @@ render stateref buffers = do
 
 		clear [ColorBuffer, DepthBuffer]
 		forM_ buffers renderModel
-		swapBuffers
+		GLFW.swapBuffers
 	where float = realToFrac
 
 
@@ -206,20 +208,19 @@ main = do
 	stateref <- newIORef AppState { _rotation=(0,0), _mouse=Nothing, _clientsize=(720, 480) } --
 	(cx, cy) <- liftM _clientsize . readIORef $ stateref                                      -- Yes, I know this is stupid.
 
-	monitor <- getPrimaryMonitor
-	window  <- createWindow cx cy "WaveFront OBJ Sample (2015)" mmon mwin
+	mmonitor <- getPrimaryMonitor
+	window  <- createWindow cx cy "WaveFront OBJ Sample (2015)" mmonitor Nothing
 
 	initialDisplayMode $= [DoubleBuffered, RGBMode, WithDepthBuffer, Multisampling]
-	initialWindowSize  $= (Size cx cy)
 
 	putStrLn "Creating buffers..."
 	let buffers = [createBuffers model]
 
 
-	displayCallback $= (render stateref buffers)
-	motionCallback  $= Just (onmousedrag stateref)
-	mouseCallback   $= Just (onmouseup stateref)
-	reshapeCallback $= Just (onwindowresize stateref)
+	setWindowRefreshCallback $ Just (render stateref buffers)
+	setCursorPosCallback     $ Just (onmousedrag stateref)
+	setMouseButtonCallback   $ Just (onmouseup stateref)
+	setWindowSizeCallback    $ Just (onwindowresize stateref)
 	addTimerCallback (div 100 30) (animate 30)
 
 	putStrLn "Finished creating buffers."
