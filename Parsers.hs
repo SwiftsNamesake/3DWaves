@@ -73,23 +73,18 @@ module Southpaw.WaveFront.Parsers (parseOBJ, parseMTL,
 ---------------------------------------------------------------------------------------------------
 -- We'll need these
 ---------------------------------------------------------------------------------------------------
-import Data.List   (groupBy)
+import Data.List   (groupBy, unzip4)
 import Data.Maybe  (listToMaybe)
 import Data.Either (rights, isLeft)
+import qualified Data.Map as Map
 
-import Text.Read   (readMaybe, readEither)
+import Text.Read     (readMaybe, readEither)
+import Control.Monad (forM_)
+
 
 import Southpaw.Utilities.Utilities (pairwise, cuts)
 import Southpaw.WaveFront.Utilities
 
-import qualified Data.Map as Map
-
-import System.FilePath (splitFileName, (</>))
-import Control.Monad   (forM_)
-
--- import Control.Concurrent (threadDelay)
-import Text.Printf (printf)
-import System.IO   (hFlush, stdout)
 
 
 
@@ -192,6 +187,7 @@ data Material = Material { ambient :: Colour, diffuse :: Colour, specular :: Col
 -- TODO: Separate type for processed OBJTokens (ie. token + context)
 -- TODO: Perform index lookups (?)
 -- TODO: Reconsider the types (especially of the materials)
+-- TODO: Rename accessor functions (eg. texcoords instead of textures) (?)
 --
 data Model = Model { vertices  :: [Vector Float],
                      normals   :: [Vector Float],
@@ -244,9 +240,9 @@ parseOBJRow ln = parseTokenWith ln $ \ (attr:values) -> case attr:values of
     ["v",  sx, sy, sz] -> vector (\ [x, y, z] -> OBJVertex  x y z) [sx, sy, sz] -- Vertex
     ["vn", sx, sy, sz] -> vector (\ [x, y, z] -> OBJNormal  x y z) [sx, sy, sz] -- Normal
     ["vt", sx, sy]     -> vector (\ [x, y]    -> OBJTexture x y)   [sx, sy]     -- Texture
-    ("g":_)            -> Right . Group  $ values                               -- Group
-    ("o":_)            -> Right . Object $ values                               -- Object
-    ("s":_)            -> Left ln                                               -- Smooth shading
+    ("g":_:_)          -> Right . Group  $ values                               -- Group
+    ("o":_:_)          -> Right . Object $ values                               -- Object
+    ("s":_:_)          -> Left ln                                               -- Smooth shading
     ["mtllib", lib]    -> Right . LibMTL $ lib                                  --
     ["usemtl", mtl]    -> Right . UseMTL $ mtl                                  --
     _                  -> Left ln                                               -- TODO More informative errors
@@ -392,47 +388,33 @@ createModel tokens materials = let modeldata  = rights $ map second tokens -- TO
                                           materials = materials }
 
 
----------------------------------------------------------------------------------------------------
--- Functions (IO)
----------------------------------------------------------------------------------------------------
--- Loading data -----------------------------------------------------------------------------------
--- |
---
--- TODO: Use bytestrings (?)
---
-loadOBJ :: String -> IO OBJ
-loadOBJ fn = do
-  rawOBJ <- readFile fn    --
-  return $ parseOBJ rawOBJ --
+-- | Extracts vertex, normal, texture and material data from a model
+-- TODO: Figure out how to deal with missing indices
+modelAttributes :: Model -> ([Vector], [Maybe Vector], [Maybe Vector], [Material]) 
+modelAttributes model = unzip4 $ [ map (attributesAt mat) theindices | Face { material=mat, indices=theindices } <- faces model]
+  where
+    vertexAt     = vertices model
+    normalAt     = liftM (!! normals model)
+    texcoordAt   = liftM (!! textures model)
+    attributesAt mat (vi, ni, ti) = (vertexAt vi, normalAt ni, texcoordAt ti, mat)
 
 
 -- |
---
--- TODO: Use bytestrings (?)
--- TODO: Merge OBJ and MTL parsers (and plug in format-specific code as needed) (?)
---
-loadMTL :: String -> IO MTL
-loadMTL fn = do
-  rawMTL <- readFile fn    -- Unparsed MTL data (text)
-  return $ parseMTL rawMTL --
-
+-- unpackModelAttributes :: 
 
 -- |
--- TODO: Better names (than 'mtls' and 'fns') (?)
--- TODO: Refactor, simplify
--- TODO: Improve path handling (cf. '</>')
-loadMaterials :: [String] -> IO MTLTable
-loadMaterials fns = do
-  mtls <- mapM loadMTL fns --
-  return . createMTLTable . zip (map (snd . splitFileName) fns) . map tokensOf $ mtls --
-  where tokensOf = rights . map second
+--
+-- TODO: Simplify, refactor, better names
+-- TODO: Rename (?)
+--
+createBuffers :: WF.Model -> Buffers
+createBuffers model = zip3 (map normalOf $ WF.faces model) (map WF.material $ WF.faces model) (map verticesOf $ WF.faces model)
+  where
+      normalOf   face = normalAt . head . catMaybes . map third $ WF.indices face -- TODO: Don't use catMaybes
+      verticesOf face = map (vertexAt . first) $ WF.indices face
+      normalAt i = triplet Normal3 $ (WF.normals model)  !! (i-1) -- TODO: Make sure the subtraction isn't performed by the parsers
+      vertexAt i = triplet Vertex3 $ (WF.vertices model) !! (i-1) --
 
-
--- |
--- Loads an OBJ model from file, including associated materials
-loadModel :: String -> IO Model
-loadModel fn = do
-  obj       <- loadOBJ fn
-  materials <- loadMaterials [ (fst $ splitFileName fn) </> name | LibMTL name <- rights $ map second obj ]
-  return $ createModel obj materials
-  where loadWithName name = loadMTL name >>= return . (name,)
+      triplet f (x, y, z) = f (realToFrac x) (realToFrac y) (realToFrac z)
+      first (v, _, _)     = v
+      third (_, _, n)     = n

@@ -103,31 +103,6 @@ initOpenGL = do
 	-- scale (0.05 :: GLfloat) 0.5 0.5
 
 
--- | 
---
--- TODO: Simplify, refactor, better names
---
-createBuffers :: WF.Model -> Buffers
-createBuffers model = triplets normals' (map WF.material faces') vertices'
-	where faces'     = WF.faces model
-	      vertexdata = WF.vertices model
-	      normaldata = WF.normals model
-
-	      normals'  = map normalOf faces'
-	      vertices' = map verticesOf faces'
-
-	      normalOf   face = normalAt . head . catMaybes . map third $ WF.indices face -- TODO: Don't use catMaybes
-	      verticesOf face = map (vertexAt . first) $ WF.indices face
-	      
-	      normalAt i = triplet Normal3 $ normaldata !! (i-1) -- TODO: Make sure the subtraction isn't performed by the parsers
-	      vertexAt i = triplet Vertex3 $ vertexdata !! (i-1)
-
-	      triplet f (x, y, z) = f (realToFrac x) (realToFrac y) (realToFrac z)
-	      first (v, _, _)     = v
-	      third (_, _, n)     = n
-
-	      triplets = zip3
-
 
 -- |
 -- TODO: Improve control flow
@@ -243,6 +218,15 @@ render stateref buffers window = do
 -- TODO: Refactor, simplify
 renderModel :: Buffers -> IO ()
 renderModel buffers = forM_ buffers renderFace
+
+
+-- | 
+-- TODO: Use index buffer (?)
+createMesh :: Model -> IO Mesh
+createMesh model = do
+	vertices <- makeBuffer ArrayBuffer $ concat [ [x, y, z] | (x, y, z) <- WF.vertices model]
+	colours  <- makeBuffer ArrayBuffer $
+	normals  <- makeBuffer ArrayBuffer $
 
 
 -- |
