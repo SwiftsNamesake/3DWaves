@@ -63,10 +63,10 @@
 -- Section
 ---------------------------------------------------------------------------------------------------
 module Southpaw.WaveFront.Parsers (parseOBJ, parseMTL,
-                                   loadOBJ,  loadMTL, loadModel,
                                    facesOf,  materialsOf,
-                                   MTL(), OBJ(), Model(..), Face(..), Material(..), OBJToken(..), MTLToken(..),
-                                   createModel) where
+                                   modelAttributes,
+                                   MTL(), OBJ(), Model(..), Face(..), Material(..), OBJToken(..), MTLToken(..), MTLTable(..),
+                                   createModel, createMTLTable) where
 
 
 
@@ -79,7 +79,7 @@ import Data.Either (rights, isLeft)
 import qualified Data.Map as Map
 
 import Text.Read     (readMaybe, readEither)
-import Control.Monad (forM_)
+import Control.Monad (forM_, liftM)
 
 
 import Southpaw.Utilities.Utilities (pairwise, cuts)
@@ -165,6 +165,7 @@ type Point  num = (num, num)      -- Haskell is no longer Point-free
 -- TODO: Validation (eg. length ivertices == length == ivertices == length itextures if length isn't 0)
 -- TOOD: Pack indices in a tuple (eg. indices :: [(Int, Int, Int)]) (?)
 -- TOOD: Use (String, String) for the names of the mtl file and material instead of Material (?)
+-- TODO: Use types so as not to confuse the indices (eg. newtype INormal, newtype ITexcoord)
 data Face = Face { indices :: [(Int, Maybe Int, Maybe Int)], material :: Material } deriving (Show)
 
 
@@ -390,31 +391,18 @@ createModel tokens materials = let modeldata  = rights $ map second tokens -- TO
 
 -- | Extracts vertex, normal, texture and material data from a model
 -- TODO: Figure out how to deal with missing indices
-modelAttributes :: Model -> ([Vector], [Maybe Vector], [Maybe Vector], [Material]) 
-modelAttributes model = unzip4 $ [ map (attributesAt mat) theindices | Face { material=mat, indices=theindices } <- faces model]
+modelAttributes :: Model -> ([Vector Float], [Maybe (Point Float)], [Maybe (Vector Float)], [Material]) 
+modelAttributes model = unzip4 $ concat [ map (attributesAt mat) theindices | Face { material=mat, indices=theindices } <- faces model]
   where
-    vertexAt     = vertices model
-    normalAt     = liftM (!! normals model)
-    texcoordAt   = liftM (!! textures model)
-    attributesAt mat (vi, ni, ti) = (vertexAt vi, normalAt ni, texcoordAt ti, mat)
+    vertexAt   = (vertices model !!)         . subtract 1 -- 
+    normalAt   = liftM $ (normals model  !!) . subtract 1 -- 
+    texcoordAt = liftM $ (textures model !!) . subtract 1 -- 
+    attributesAt mat (vi, ti, ni) = (vertexAt vi, texcoordAt ti, normalAt ni, mat)
+
+
+-- |
+-- tessellate 
 
 
 -- |
 -- unpackModelAttributes :: 
-
--- |
---
--- TODO: Simplify, refactor, better names
--- TODO: Rename (?)
---
-createBuffers :: WF.Model -> Buffers
-createBuffers model = zip3 (map normalOf $ WF.faces model) (map WF.material $ WF.faces model) (map verticesOf $ WF.faces model)
-  where
-      normalOf   face = normalAt . head . catMaybes . map third $ WF.indices face -- TODO: Don't use catMaybes
-      verticesOf face = map (vertexAt . first) $ WF.indices face
-      normalAt i = triplet Normal3 $ (WF.normals model)  !! (i-1) -- TODO: Make sure the subtraction isn't performed by the parsers
-      vertexAt i = triplet Vertex3 $ (WF.vertices model) !! (i-1) --
-
-      triplet f (x, y, z) = f (realToFrac x) (realToFrac y) (realToFrac z)
-      first (v, _, _)     = v
-      third (_, _, n)     = n
