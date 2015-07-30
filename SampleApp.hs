@@ -1,6 +1,6 @@
 -- |
 -- Module      : Southpaw.WaveFront.SampleApp
--- Description : Exectuble which loads a model and displays it using OpenGL
+-- Description : Executable which loads a model and displays it using OpenGL
 -- Copyright   : (c) Jonatan H Sundqvist, 2015
 -- License     : MIT
 -- Maintainer  : Jonatan H Sundqvist
@@ -11,7 +11,8 @@
 -- Created July 15 2015
 
 -- TODO | - Break up the functionality of this program into several modules
---        - 
+--        - FPS
+--        - Cleanup
 
 -- SPEC | -
 --        -
@@ -60,8 +61,10 @@ import Data.IORef
 import Southpaw.Utilities.Utilities (numeral, gridM)
 
 import qualified Southpaw.WaveFront.Parsers    as WF      -- (loadModel, loadOBJ, loadMTL, facesOf, Model(..), Face(..), OBJToken(..), Material(..))
-import qualified Southpaw.WaveFront.Load       as WFL     --
-import qualified Southpaw.Michelangelo.Shaders as Shaders --
+import qualified Southpaw.WaveFront.Load       as WFL     -- 
+import qualified Southpaw.Michelangelo.Shaders as Shaders -- 
+import qualified Southpaw.Michelangelo.Mesh    as Mesh    -- 
+import           Southpaw.Michelangelo.Mesh (Mesh(..))    -- 
 
 
 
@@ -71,14 +74,7 @@ import qualified Southpaw.Michelangelo.Shaders as Shaders --
 ---------------------------------------------------------------------------------------------------
 -- | 
 type Buffers = [(Normal3 GLfloat, WF.Material, [Vertex3 GLfloat])]
-data AppState = AppState { _rotation :: (Double, Double), _mouse :: Maybe (Double, Double), _clientsize :: (Int, Int) } deriving (Show)
-
-data Mesh    = Mesh { vertices  :: BufferObject,
-	                  colours   :: BufferObject,
-	                  normals   :: Maybe BufferObject,
-	                  texcoords :: Maybe BufferObject,
-	                  size      :: Int}
-	           deriving (Show)
+data AppState = AppState { _rotation :: (Double, Double), _mouse :: Maybe (Double, Double), _clientsize :: (Int, Int), _frame :: Int } deriving (Show)
 
 
 
@@ -88,56 +84,24 @@ data Mesh    = Mesh { vertices  :: BufferObject,
 -- | 
 initOpenGL :: IO (Maybe Program)
 initOpenGL = do
+
+	--
+	showOpenGLInformation
+
 	--
 	depthFunc $= Just Lequal
-
-	printError
+	-- blend      $= Enabled
+	-- blendFunc  $= (SrcAlpha, OneMinusSrcAlpha)
 
 	-- Shader setup
 	let path = "C:\\Users\\Jonatan\\Desktop\\Haskell\\modules\\Southpaw\\lib\\Southpaw\\WaveFront"
 	eprogram <- Shaders.loadShaderProgram (path </> "shader-vertex.glsl") (path </> "shader-pixel.glsl")
 
-	printError
-
 	mprogram <- either
-	  (\ logs    -> printf "Unable to load shader program: %s" (show logs) >> return Nothing)
+	  (\ logs    -> printf "Unable to load shader program:\n%s" (unlines logs) >> return Nothing)
 	  (\ program -> currentProgram $= Just program >> return (Just program))
 	  (eprogram)
 
-	printError
-
-	_ <- perhaps (return ()) mprogram $ \program -> do
-		putStrLn "Attribute setup"
-		attribLocation program "aVertexPosition" $= AttribLocation 0
-		attribLocation program "aVertexColor"    $= AttribLocation 1
-
-		printError
-
-		vertexAttribArray (AttribLocation 0) $= Enabled
-		vertexAttribArray (AttribLocation 1) $= Enabled
-
-		printError
-	-- lineSmooth $= Enabled
-	-- blend      $= Enabled
-	-- blendFunc  $= (SrcAlpha, OneMinusSrcAlpha)
-	
-	-- matrixMode  $= Projection
-	-- perspective 40.0 1.0 1.0 10.0
-
-	printError
-
-	-- matrixMode $= Modelview 0
-	-- lookAt (Vertex3 0.0 0.0 5.0) (Vertex3 0.0 0.0 0.0) (Vector3 0.0 1.0 0.0)
-
-	throwError
-
-	-- translate    ((Vector3 0.0 0.0 (-4.0)) :: Vector3 GLfloat)
-	-- rotate (-30) ((Vector3 1.0 0.0   0.0)  :: Vector3 GLfloat)
-	-- rotate (-20) ((Vector3 0.0 0.0   1.0)  :: Vector3 GLfloat)
-
-	throwError
-
-	-- scale (0.05 :: GLfloat) 0.5 0.5
 	return mprogram
 
 
@@ -147,8 +111,11 @@ render program stateref meshes window = do
 	--
 	(rx, ry)   <- liftM _rotation   . readIORef $ stateref
 	(cxi, cyi) <- liftM _clientsize . readIORef $ stateref
+	frame      <- liftM _frame      . readIORef $ stateref
 
-	let (cols, rows) = (2, 2)
+	modifyIORef stateref $ \state@(AppState { _frame=n }) -> state { _frame=(n+1) }
+
+	let (cols, rows) = (1, 1)
 	gridM cols rows $ \ wxi wyi -> do
 
 		let (cx, cy) = (cint cxi, cint cyi)
@@ -157,35 +124,22 @@ render program stateref meshes window = do
 		    width    = (div cx cols)
 		    height   = (div cy rows)
 
-		clearColor $= Color4 (min 1.0 $ 0.5*float (wxi-1)) (min 1.0 $ 0.5*float (wyi-1)) (min 1.0 $ float (wxi-1)*float (wyi-1)*0.3) (1.0 :: GLfloat)
+		-- clearColor $= Color4 (min 1.0 $ 0.5*float (wxi-1)) (min 1.0 $ 0.5*float (wyi-1)) (min 1.0 $ float (wxi-1)*float (wyi-1)*0.3) (1.0 :: GLfloat)
+		clearColor $= Color4 (0.2) (0.72) (0.23) (1.0)
 		viewport   $=      (Position left top, Size width height)
-		scissor    $= Just (Position left top, Size width height)
-
-		throwError
-
-		-- TODO: Refactor with preservingMatrix (?)
-		-- matrixMode $= Modelview 0
-		-- loadIdentity
-		-- lookAt (Vertex3 0.0 0.0 5.0) (Vertex3 0.0 0.0 0.0) (Vector3 0.0 1.0 0.0)
-
-		throwError
-
-		-- translate ((Vector3 0.0 (-2.0) (-4.0)) :: Vector3 GLfloat)
-		-- rotate (180.0 * (float rx/float cxi)) ((Vector3 0.0 1.0 0.0) :: Vector3 GLfloat)
-		-- rotate (180.0 * (float ry/float cyi)) ((Vector3 1.0 0.0 0.0) :: Vector3 GLfloat)
-
-		throwError
+		-- scissor    $= Just (Position left top, Size width height)
 
 		clear [ColorBuffer, DepthBuffer]
-		forM_ meshes (renderMesh program (V3 0.0 (6*float ry/float cyi) (6*float rx/float cxi)) (V3 0 0 0))
+		forM_ meshes (Mesh.renderMesh program (V3 0.0 (6*float ry/float cyi) (6*float rx/float cxi)) (V3 0 (2 * pi * float ry/float cyi) 0))
 	GLFW.swapBuffers window
 	throwError
 
-	where float :: (Real r, Fractional f) => r -> f -- TODO: Whuuuuuuut (monomorphism restriction)?
-	      float = realToFrac   
+	where
+	  float :: (Real r, Fractional f) => r -> f -- TODO: Whuuuuuuut (monomorphism restriction)?
+	  float = realToFrac   
 
-	      cint :: (Num n,  Integral i) => i -> n -- TODO: Ditto (?)
-	      cint = fromIntegral
+	  cint :: (Num n,  Integral i) => i -> n -- TODO: Ditto (?)
+	  cint = fromIntegral
 
 
 -- |
@@ -197,71 +151,29 @@ render program stateref meshes window = do
 
 
 -- | 
--- TODO: Use index buffer (  ?)
-createMesh :: WF.Model -> IO Mesh
-createMesh model = do
+-- TODO: Use index buffer (?)
+-- TODO: Texture support
+createMesh :: Program -> WF.Model -> IO Mesh.Mesh
+createMesh program model = do
 	putStrLn "Creating mesh from model"
-	vertices  <- makeBuffer ArrayBuffer . concat $ ([ map realToFrac [x, y, z]    | (x, y, z)    <- vs] :: [[CFloat]])                        -- 
-	normals   <- liftM Just . makeBuffer ArrayBuffer . concat $ ([ map realToFrac [x, y, z]    | (x, y, z)    <- catMaybes ns] :: [[CFloat]]) -- 
-	texcoords <- return Nothing -- makeBuffer ArrayBuffer . concat $ [ [x, y]       | (x, y)       <- catMaybes ts]                           -- 
-	colours   <- makeBuffer ArrayBuffer . concat $ ([ map realToFrac [r, g, b, a] | (r, g, b, a) <- map WF.diffuse ms] :: [[CFloat]])         -- 
-	printError
-	return Mesh { vertices  = vertices,
-	              normals   = normals,
-	              texcoords = texcoords,
-	              colours   = colours,
-	              size      = length vs}
+	thevertices  <- makeBuffer ArrayBuffer . concat $ ([ map realToFrac [x, y, z]    | (x, y, z)    <- vs] :: [[CFloat]])                     -- 
+	thecolours   <- makeBuffer ArrayBuffer . concat $ ([ map realToFrac [r, g, b, a] | (r, g, b, a) <- map WF.diffuse ms] :: [[CFloat]])      -- 
+	thenormals   <- liftM Just . makeBuffer ArrayBuffer . concat $ ([ map realToFrac [x, y, z] | (x, y, z)    <- catMaybes ns] :: [[CFloat]]) -- 
+	thetexcoords <- liftM Just . makeBuffer ArrayBuffer . concat $ ([ map realToFrac [x, y]    | (x, y)       <- catMaybes ts] :: [[CFloat]]) -- 
+
+	locv <- get $ attribLocation program "aVertexPosition" --
+	locc <- get $ attribLocation program "aVertexColor"    --
+
+	-- TODO: Initialise properly
+	return Mesh.Mesh { Mesh.attributes=Map.fromList [("aVertexPosition", (locv, thevertices, 3)), ("aVertexColor", (locc, thecolours, 4))],
+	                   Mesh.texture=Nothing,
+	                   Mesh.shader=program,
+	                   Mesh.primitive=Triangles,
+	                   Mesh.uniforms=Map.empty,
+	                   Mesh.size=length $ vs }
 	where (vs, ts, ns, ms) = WF.modelAttributes model
 
 
--- |
-renderMesh :: Program -> V3 Float -> V3 Float -> Mesh -> IO ()
-renderMesh program (V3 tx ty tz) (V3 rx ry rz) (Mesh { vertices=v, normals=n, texcoords=t, colours=c, size=s }) = do
-	-- putStrLn "Rendering mesh"
-	-- TODO: Don't hard-code attribute locations
-	-- TODO: I probably shouldn't be looking up uniform and attribute locations with each frame render...
-	-- attributes <- get (activeAttribs program)
-	-- let vertexAttrib = AttribLocation program _ -- $ head [ pos | (pos, _, "aVertexPosition") <- attributes ]
-	-- let colourAttrib = AttribLocation $ head [ pos | (pos, _, "aVertexColor") <- attributes ]
-	-- attribLocation program "aVertexPosition" $= AttribLocation 0
-	-- attribLocation program "aVertexColor"    $= AttribLocation 3
-
-	-- throwError
-
-	-- vertexAttribArray (AttribLocation 0) $= Enabled
-	-- vertexAttribArray (AttribLocation 3) $= Enabled
-	-- vertexAttribArray (AttribLocation 2) $= Enabled
-	vertexattrib <- get $ attribLocation program "aVertexPosition"
-	colourattrib <- get $ attribLocation program "aVertexColor"
-
-
-	vertexAttribArray (AttribLocation 0) $= Enabled
-	vertexAttribArray (AttribLocation 1) $= Enabled
-
-	bindBuffer ArrayBuffer $= Just v
-	--(plusPtr nullPtr 0)
-	vertexAttribPointer (vertexattrib) $= (ToFloat, VertexArrayDescriptor 3 Float 0 offset0)
-
-	throwError
-
-	-- bindBuffer ArrayBuffer $= Just n
-	-- vertexAttribPointer (AttribLocation 1) $= (ToFloat, VertexArrayDescriptor 3 Float 0 offset0)
-	
-	throwError
-
-	bindBuffer ArrayBuffer $= Just c
-	vertexAttribPointer (colourattrib) $= (ToFloat, VertexArrayDescriptor 4 Float 0 offset0)
-
-	Shaders.setShaderUniforms program (V3 tx ty tz) (V3 rx ry rz)
-	throwError
-	drawArrays TriangleFan 0 (fromIntegral $ s) --
-	throwError
-
-	vertexAttribArray (AttribLocation 0) $= Disabled
-	vertexAttribArray (AttribLocation 1) $= Disabled
-
--- drawArrays :: PrimitiveMode -> ArrayIndex -> NumArrayIndices -> IO ()
--- bindVertexArrayObject :: StateVar (Maybe VertexArrayObject)
 
 
 -- Events -----------------------------------------------------------------------------------------
@@ -320,6 +232,7 @@ assumingM p a b = p >>= \ done -> if done then a else b
 -- | Perform an action until the returned value satisfies the condition
 -- TODO: Pass in previous result (✓)
 -- TODO: Refactor, rename variables (?)
+-- TODO: Move to separate module (eg. loops/control structures) (?)
 untilM :: Monad m => (a -> m Bool) -> (a -> m a) -> m a -> m a
 untilM p f x = do
 	value <- x 
@@ -346,6 +259,17 @@ mainloop program window stateref meshes = do
 
 ---------------------------------------------------------------------------------------------------
 
+-- |
+showOpenGLInformation :: IO ()
+showOpenGLInformation = do
+	printf "\n==== Version information =================================================\n"
+	get vendor    >>= printf "Vendor:   %s\n"
+	get renderer  >>= printf "Renderer: %s\n"
+	get glVersion >>= printf "Version:  %s\n"
+	get shadingLanguageVersion >>= printf "GLSL Version: %s\n"
+	printf "==========================================================================\n\n"
+
+---------------------------------------------------------------------------------------------------
 
 -- |
 listOBJFiles :: String -> IO (Either String [String])
@@ -363,13 +287,16 @@ chooseModelsFrom path = do
 	epaths <- listOBJFiles path
 	possibly (\_ -> return $ Left "No such directory") epaths $ \paths -> do
 		putStrLn "Which model would you like to load?"
-		mapM (\ (n, path) -> printf "  [%d] %s\n" n path) $ zip ([0..] :: [Int]) paths
-		Just choice <- untilM (valid paths) (const $ prompt "That doesn't work. Try again: ") (prompt "Choose one: ")
-		return $ Right (paths !! choice)
+		mapM option $ zip ([1..] :: [Int]) paths
+		choice <- untilM (valid paths) (const $ prompt "That doesn't work. Try again: ") (prompt "Choose one: ")
+		return $ case choice of
+			Just index -> Right $ paths !! (index-1) -- 
+			Nothing    -> Left  $ "Invalid choice"    -- This should never happen, throw error instead (?)
 	where
-		valid paths = return . maybe False (clamped 0 (length paths))        --
-		prompt q    = putStr q >> hFlush stdout >> (liftM readMaybe) getLine --
-		possibly f x g = either f g x                                        --
+		valid paths = return . maybe False (clamped 0 (length paths) . (subtract 1)) -- Is th
+		prompt q    = putStr q >> hFlush stdout >> (liftM readMaybe) getLine         -- Ask for input (flush is sometimes required when q doesn't end in a newline)
+		possibly f x g   = either f g x                                              -- Do-block at the end instead of in the middle
+		option (n, path) = printf "  [%d] %s\n" n path                               -- Prints a model option
 
 
 
@@ -387,12 +314,13 @@ main = do
 	printf "Finished loading model '%s' with %d faces and %d vertices.\n" modelname (length $ WF.faces model) (length $ WF.vertices model)
 
 	--
-	stateref <- newIORef AppState { _rotation=(0,0), _mouse=Nothing, _clientsize=(720, 480) } --
-	(cx, cy) <- liftM _clientsize . readIORef $ stateref                                      -- Yes, I know this is stupid.
+	stateref <- newIORef AppState { _rotation=(0,0), _mouse=Nothing, _clientsize=(720, 480), _frame=1 } --
+	(cx, cy) <- liftM _clientsize . readIORef $ stateref                                                -- Yes, I know this is stupid.
 
 	True <- GLFW.init
 	-- mmonitor <- GLFW.getPrimaryMonitor
 	-- GLFW.defaultWindowHints -- TODO: Before or after window creation (?)
+	GLFW.windowHint $ GLFW.WindowHint'Samples 4
 	mwindow  <- GLFW.createWindow cx cy "WaveFront OBJ Sample (2015)" Nothing Nothing
 
 	perhaps (putStrLn "Failed to create window") mwindow $ \window -> do
@@ -400,21 +328,23 @@ main = do
 		GLFW.makeContextCurrent $ Just window -- Not sure why this is needed or what it does
 
 		-- GLFW.setWindowRefreshCallback window $ Just (render stateref buffers)
-		GLFW.setCursorPosCallback     window $ Just (onmousedrag stateref)
-		GLFW.setMouseButtonCallback   window $ Just (onmousepress stateref)
-		GLFW.setWindowSizeCallback    window $ Just (onwindowresize stateref)
+		GLFW.setMouseButtonCallback window $ Just (onmousepress stateref)
+		GLFW.setCursorPosCallback   window $ Just (onmousedrag stateref)
+		GLFW.setWindowSizeCallback  window $ Just (onwindowresize stateref)
+		-- GLFW.setDropCallback      window $ Nothing
+		-- GLFW.setCharCallback
+		-- GLFW.setKeyCallback
+		-- GLFW.setErrorCallback
 		-- GLFW.addTimerCallback (div 100 30) (animate 30)
 
 		putStrLn "Creating buffers..."
 		mprogram <- initOpenGL
-		meshes   <- mapM createMesh [model]
 		putStrLn "Finished creating buffers."
 
 		-- GLFW.pollEvents -- mainLoop
-		maybe
-		  (putStrLn "Sumtin baay-uhd happened. Bailing out...")
-		  (\program -> mainloop program window stateref meshes)
-		  (mprogram)
+		perhaps (putStrLn "Sumtin baay-uhd happened. Bailing out...") (mprogram) $ \program -> do
+			meshes <- mapM (createMesh program) [model]
+			mainloop program window stateref meshes
 
 		GLFW.destroyWindow window
 		GLFW.terminate

@@ -48,12 +48,16 @@ newtype CMTL = CMTL Parsers.MTL
 instance Storable COBJ where
 	sizeOf    = const 0
 	alignment = const 0
+	peek _    = error "Work in progress"
+	poke _    = error "Work in progress"
 
 
 -- | We 
 instance Storable CMTL where
 	sizeOf    = const 0
 	alignment = const 0
+	peek _    = error "Work in progress"
+	poke _    = error "Work in progress"
 
 
 

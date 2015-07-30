@@ -64,8 +64,8 @@
 ---------------------------------------------------------------------------------------------------
 module Southpaw.WaveFront.Parsers (parseOBJ, parseMTL,
                                    facesOf,  materialsOf,
-                                   modelAttributes,
-                                   MTL(), OBJ(), Model(..), Face(..), Material(..), OBJToken(..), MTLToken(..), MTLTable(..),
+                                   modelAttributes, tessellate,
+                                   MTL(), OBJ(), Model(..), Face(..), Material(..), OBJToken(..), MTLToken(..), MTLTable(),
                                    createModel, createMTLTable) where
 
 
@@ -75,11 +75,11 @@ module Southpaw.WaveFront.Parsers (parseOBJ, parseMTL,
 ---------------------------------------------------------------------------------------------------
 import Data.List   (groupBy, unzip4)
 import Data.Maybe  (listToMaybe)
-import Data.Either (rights, isLeft)
+import Data.Either (rights)
 import qualified Data.Map as Map
 
 import Text.Read     (readMaybe, readEither)
-import Control.Monad (forM_, liftM)
+import Control.Monad (liftM)
 
 
 import Southpaw.Utilities.Utilities (pairwise, cuts)
@@ -339,18 +339,19 @@ facesOf tokens table = reverse . third . foldl update ("", "", []) $ tokens
 -- TODO: Filter out parser failures (?)
 -- TOOD: Deal with duplicated attributes (probably won't crop up in any real situations)
 materialsOf :: [MTLToken] -> Map.Map String (Either String Material)
-materialsOf tokens = Map.fromList . rights $ map createMaterial groups
- where groups = groupBy (((not . isnew) .) . flip const) tokens -- TODO: Refactor this atrocity
-       isnew (NewMaterial _) = True  -- TODO: Rename isnew
-       isnew  _              = False
-       createMaterial (NewMaterial name:attrs) = Right $ (name, fromAttributes attrs)
-       createMaterial  attrs                   = Left  $ "Free-floating attributes: " ++ show attrs
-       fromAttributes  attrs
-         | any null colours = Left  $ "Missing colour(s)" -- TODO: More elaborate message (eg. which colour)
-         | otherwise        = Right $ Material { ambient=head amb, diffuse=head diff, specular=head spec, texture=listToMaybe [ name | MapDiffuse name <- attrs ] }
-         where colours@[diff, spec, amb] = [[ (r, g, b, maybe 1.0 id a) | Diffuse  r g b a <- attrs ],
-                                            [ (r, g, b, maybe 1.0 id a) | Specular r g b a <- attrs ],
-                                            [ (r, g, b, maybe 1.0 id a) | Ambient  r g b a <- attrs ]]
+materialsOf tokens = Map.fromList . rights $ map createMaterial thegroups
+  where
+    thegroups = groupBy (((not . isnew) .) . flip const) tokens -- TODO: Refactor this atrocity
+    isnew (NewMaterial _) = True  -- TODO: Rename isnew
+    isnew  _              = False
+    createMaterial (NewMaterial name:attrs) = Right $ (name, fromAttributes attrs)
+    createMaterial  attrs                   = Left  $ "Free-floating attributes: " ++ show attrs
+    fromAttributes  attrs
+      | any null colours = Left  $ "Missing colour(s)" -- TODO: More elaborate message (eg. which colour)
+      | otherwise        = Right $ Material { ambient=head amb, diffuse=head diff, specular=head spec, texture=listToMaybe [ name | MapDiffuse name <- attrs ] }
+      where colours@[diff, spec, amb] = [[ (r, g, b, maybe 1.0 id a) | Diffuse  r g b a <- attrs ],
+                                         [ (r, g, b, maybe 1.0 id a) | Specular r g b a <- attrs ],
+                                         [ (r, g, b, maybe 1.0 id a) | Ambient  r g b a <- attrs ]]
 
 
 -- |
@@ -379,14 +380,14 @@ createMTLTable mtls = Map.fromList . map (\ (name, tokens) -> (name, Map.mapMayb
 -- I never knew pattern matching in list comprehensions could be used to filter by constructor
 -- let rows = parseOBJ data in ([ v | @v(Vertex {}) <- rows], [ v | @v(Vertex {}) <- rows])
 createModel :: OBJ -> MTLTable -> Model
-createModel tokens materials = let modeldata  = rights $ map second tokens -- TODO: Vat do vee du viz ze dissidents, kommandant?
-                               in Model { vertices  = [ (x, y, z) | OBJVertex  x y z <- modeldata ],
-                                          normals   = [ (x, y, z) | OBJNormal  x y z <- modeldata ],
-                                          textures  = [ (x, y)    | OBJTexture x y   <- modeldata ],
-                                          faces     = rights $ facesOf modeldata materials,
-                                          groups    = groupsOf  modeldata,
-                                          objects   = objectsOf modeldata,
-                                          materials = materials }
+createModel tokens thematerials = let modeldata  = rights $ map second tokens -- TODO: Vat do vee du viz ze dissidents, kommandant?
+                                  in Model { vertices  = [ (x, y, z) | OBJVertex  x y z <- modeldata ],
+                                             normals   = [ (x, y, z) | OBJNormal  x y z <- modeldata ],
+                                             textures  = [ (x, y)    | OBJTexture x y   <- modeldata ],
+                                             faces     = map tessellate . rights $ facesOf modeldata thematerials,
+                                             groups    = groupsOf  modeldata,
+                                             objects   = objectsOf modeldata,
+                                             materials = thematerials }
 
 
 -- | Extracts vertex, normal, texture and material data from a model
@@ -401,7 +402,12 @@ modelAttributes model = unzip4 $ concat [ map (attributesAt mat) theindices | Fa
 
 
 -- |
--- tessellate 
+-- TODO: Specialise to [[Face]] (?)
+-- TODO: Check vertex count (has to be atleast three)
+-- TODO: Better names (?)
+tessellate :: Face -> Face
+tessellate face@(Face { indices=ind }) = face { indices=triangles ind }
+  where triangles (a:rest) =concat $ pairwise (\b c -> [a, b, c]) rest
 
 
 -- |
