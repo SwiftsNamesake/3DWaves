@@ -30,7 +30,8 @@ import Graphics.Rendering.OpenGL
 import Graphics.Rendering.OpenGL.GL.Shaders.ShaderObjects
 -- import qualified Graphics.Rendering.OpenGL.Raw as GLRaw
 
-import Graphics.GLUtil hiding (loadShaderProgram)
+import Graphics.GLUtil hiding        (loadShaderProgram)
+import Graphics.GLUtil.JuicyTextures (readTexture)
 
 import qualified Graphics.UI.GLFW as GLFW
 import Graphics.UI.GLFW as GLFW (MouseButton(..), KeyState(..), MouseButtonState(..))
@@ -82,7 +83,7 @@ data AppState = AppState { _rotation :: (Double, Double), _mouse :: Maybe (Doubl
 -- Functions
 ---------------------------------------------------------------------------------------------------
 -- | 
-initOpenGL :: IO (Maybe Program)
+initOpenGL :: IO ()
 initOpenGL = do
 
 	--
@@ -93,21 +94,23 @@ initOpenGL = do
 	-- blend      $= Enabled
 	-- blendFunc  $= (SrcAlpha, OneMinusSrcAlpha)
 
+
+-- |
+createPrograms :: IO (Either String [Program])
+createPrograms = do
 	-- Shader setup
-	let path = "C:\\Users\\Jonatan\\Desktop\\Haskell\\modules\\Southpaw\\lib\\Southpaw\\WaveFront"
-	eprogram <- Shaders.loadShaderProgram (path </> "shader-vertex.glsl") (path </> "shader-pixel.glsl")
+	-- TODO: Load all shaders from a given path (return Map) (?)
+	let path = "C:\\Users\\Jonatan\\Desktop\\Haskell\\modules\\Southpaw\\lib\\Southpaw\\Michelangelo\\shaders"
+	eprogram <- mapM (\ (vs, ps) -> Shaders.loadShaderProgram (path </> vs) (path </> ps)) [("shader-vertex.glsl",         "shader-pixel.glsl"),
+	                                                                                        ("shader-textured-pixel.glsl", "shader-textured-vertex.glsl")]
 
-	mprogram <- either
-	  (\ logs    -> printf "Unable to load shader program:\n%s" (unlines logs) >> return Nothing)
-	  (\ program -> currentProgram $= Just program >> return (Just program))
-	  (eprogram)
-
-	return mprogram
+	-- TODO: More detailed error message (?)
+	return $ eprogram
 
 
 -- |
-render :: Program -> IORef AppState -> [Mesh] -> GLFW.WindowRefreshCallback
-render program stateref meshes window = do
+render :: IORef AppState -> [Mesh] -> GLFW.WindowRefreshCallback
+render stateref meshes window = do
 	--
 	(rx, ry)   <- liftM _rotation   . readIORef $ stateref
 	(cxi, cyi) <- liftM _clientsize . readIORef $ stateref
@@ -126,17 +129,18 @@ render program stateref meshes window = do
 
 		-- clearColor $= Color4 (min 1.0 $ 0.5*float (wxi-1)) (min 1.0 $ 0.5*float (wyi-1)) (min 1.0 $ float (wxi-1)*float (wyi-1)*0.3) (1.0 :: GLfloat)
 		clearColor $= Color4 (0.2) (0.72) (0.23) (1.0)
-		viewport   $=      (Position left top, Size width height)
+		viewport   $= (Position left top, Size width height)
 		-- scissor    $= Just (Position left top, Size width height)
 
+		-- (V3 0.0 (6*float ry/float cyi) (6*float rx/float cxi)) (V3 0 (2 * pi * float ry/float cyi) 0)
 		clear [ColorBuffer, DepthBuffer]
-		forM_ meshes (Mesh.renderMesh program (V3 0.0 (6*float ry/float cyi) (6*float rx/float cxi)) (V3 0 (2 * pi * float ry/float cyi) 0))
+		forM_ meshes (Mesh.renderMesh)
 	GLFW.swapBuffers window
 	throwError
 
 	where
 	  float :: (Real r, Fractional f) => r -> f -- TODO: Whuuuuuuut (monomorphism restriction)?
-	  float = realToFrac   
+	  float = realToFrac
 
 	  cint :: (Num n,  Integral i) => i -> n -- TODO: Ditto (?)
 	  cint = fromIntegral
@@ -153,27 +157,60 @@ render program stateref meshes window = do
 -- | 
 -- TODO: Use index buffer (?)
 -- TODO: Texture support
+-- TODO: More flexible treatment of 'programs'
 createMesh :: Program -> WF.Model -> IO Mesh.Mesh
 createMesh program model = do
 	putStrLn "Creating mesh from model"
-	thevertices  <- makeBuffer ArrayBuffer . concat $ ([ map realToFrac [x, y, z]    | (x, y, z)    <- vs] :: [[CFloat]])                     -- 
-	thecolours   <- makeBuffer ArrayBuffer . concat $ ([ map realToFrac [r, g, b, a] | (r, g, b, a) <- map WF.diffuse ms] :: [[CFloat]])      -- 
-	thenormals   <- liftM Just . makeBuffer ArrayBuffer . concat $ ([ map realToFrac [x, y, z] | (x, y, z)    <- catMaybes ns] :: [[CFloat]]) -- 
-	thetexcoords <- liftM Just . makeBuffer ArrayBuffer . concat $ ([ map realToFrac [x, y]    | (x, y)       <- catMaybes ts] :: [[CFloat]]) -- 
+	case texcoords of
+		[] -> createTexturedMesh program (vertices, texcoords) --
+		_  -> createPaintedMesh  program (vertices, ms)        --  
+	where
+	  (vs, ts, ns, ms) = WF.modelAttributes model
+	  texcoords        = concat $ ([ map realToFrac [x, y]    | (x, y)    <- catMaybes ts] :: [[CFloat]]) -- 
+	  vertices         = concat $ ([ map realToFrac [x, y, z] | (x, y, z) <- vs]           :: [[CFloat]]) -- 
 
-	locv <- get $ attribLocation program "aVertexPosition" --
-	locc <- get $ attribLocation program "aVertexColor"    --
+
+-- |
+createTexturedMesh :: Program -> ([CFloat], [CFloat]) -> IO Mesh.Mesh
+createTexturedMesh program (vs, ts) = do
+
+	vertexbuffer   <- makeBuffer ArrayBuffer $ vs -- 
+	texcoordbuffer <- makeBuffer ArrayBuffer $ ts --  
+
+	locv <- get $ attribLocation program "aVertexPosition" -- 
+	loct <- get $ attribLocation program "aTexCoord"       -- 
+	-- locc <- get $ attribLocation program "aVertexColor" -- 
 
 	-- TODO: Initialise properly
-	return Mesh.Mesh { Mesh.attributes=Map.fromList [("aVertexPosition", (locv, thevertices, 3)), ("aVertexColor", (locc, thecolours, 4))],
-	                   Mesh.texture=Nothing,
-	                   Mesh.shader=program,
-	                   Mesh.primitive=Triangles,
-	                   Mesh.uniforms=Map.empty,
-	                   Mesh.size=length $ vs }
-	where (vs, ts, ns, ms) = WF.modelAttributes model
+	return Mesh.Mesh { Mesh.attributes=Map.fromList [("aVertexPosition", (locv, vertexbuffer,   3)),
+	                                                 ("aTexCoord",       (loct, texcoordbuffer, 2))],
+
+	                   Mesh.primitive = Triangles,
+	                   Mesh.texture   = Nothing,
+	                   Mesh.shader    = program,
+	                   Mesh.uniforms  = Map.empty,
+	                   Mesh.size      = length $ vs }
 
 
+-- |
+-- TODO: Use type synomyms
+createPaintedMesh :: Program -> ([CFloat], [WF.Material]) -> IO Mesh.Mesh
+createPaintedMesh program (vs, cs) = do
+	locv <- get $ attribLocation program "aVertexPosition" -- 
+	locc <- get $ attribLocation program "aVertexColor"    -- 
+
+	vertexbuffer <- makeBuffer ArrayBuffer $ vs
+	colourbuffer <- makeBuffer ArrayBuffer . concat $ ([ map realToFrac [r, g, b, a] | (r, g, b, a) <- map WF.diffuse cs] :: [[CFloat]]) -- 
+
+	-- TODO: Initialise properly
+	return Mesh.Mesh { Mesh.attributes=Map.fromList [("aVertexPosition", (locv, vertexbuffer, 3)),
+	                                                 ("aVertexColor",    (locc, colourbuffer, 4))],
+
+	                   Mesh.primitive = Triangles,
+	                   Mesh.texture   = Nothing,
+	                   Mesh.shader    = program,
+	                   Mesh.uniforms  = Map.empty,
+	                   Mesh.size      = length $ vs }
 
 
 -- Events -----------------------------------------------------------------------------------------
@@ -249,13 +286,13 @@ clamped low upp a = (low <= a) && (a <= upp)
 ---------------------------------------------------------------------------------------------------
 
 -- |
-mainloop :: Program -> GLFW.Window -> IORef AppState -> [Mesh] -> IO ()
-mainloop program window stateref meshes = do
+mainloop :: GLFW.Window -> IORef AppState -> [Mesh] -> IO ()
+mainloop window stateref meshes = do
 	-- renderSimple window
-	render program stateref meshes window
+	render stateref meshes window
 	GLFW.pollEvents
 	closing <- GLFW.windowShouldClose window
-	unless closing $ mainloop program window stateref meshes
+	unless closing $ mainloop window stateref meshes
 
 ---------------------------------------------------------------------------------------------------
 
@@ -291,7 +328,7 @@ chooseModelsFrom path = do
 		choice <- untilM (valid paths) (const $ prompt "That doesn't work. Try again: ") (prompt "Choose one: ")
 		return $ case choice of
 			Just index -> Right $ paths !! (index-1) -- 
-			Nothing    -> Left  $ "Invalid choice"    -- This should never happen, throw error instead (?)
+			Nothing    -> Left  $ "Invalid choice"   -- This should never happen, throw error instead (?)
 	where
 		valid paths = return . maybe False (clamped 0 (length paths) . (subtract 1)) -- Is th
 		prompt q    = putStr q >> hFlush stdout >> (liftM readMaybe) getLine         -- Ask for input (flush is sometimes required when q doesn't end in a newline)
@@ -337,14 +374,17 @@ main = do
 		-- GLFW.setErrorCallback
 		-- GLFW.addTimerCallback (div 100 30) (animate 30)
 
-		putStrLn "Creating buffers..."
-		mprogram <- initOpenGL
-		putStrLn "Finished creating buffers."
+		initOpenGL
+		eprograms <- createPrograms		
 
 		-- GLFW.pollEvents -- mainLoop
-		perhaps (putStrLn "Sumtin baay-uhd happened. Bailing out...") (mprogram) $ \program -> do
-			meshes <- mapM (createMesh program) [model]
-			mainloop program window stateref meshes
+		either
+		  (\ err      -> printf "Sumtin baay-uhd happened (%s). Bailing out...\n" err)
+		  (\ programs -> do
+		    meshes <- mapM (createMesh programs) [model]
+		    mainloop program window stateref meshes)
+		  (eprograms)
+
 
 		GLFW.destroyWindow window
 		GLFW.terminate
