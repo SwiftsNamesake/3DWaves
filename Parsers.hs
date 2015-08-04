@@ -64,8 +64,9 @@
 ---------------------------------------------------------------------------------------------------
 module Southpaw.WaveFront.Parsers (parseOBJ, parseMTL,
                                    facesOf,  materialsOf,
-                                   modelAttributes, tessellate,
-                                   MTL(), OBJ(), Model(..), Face(..), Material(..), OBJToken(..), MTLToken(..), MTLTable(),
+                                   modelAttributes, tessellate, boundingbox,
+                                   hasTextures, textures,
+                                   MTL(), OBJ(), Model(..), Face(..), Material(..), OBJToken(..), MTLToken(..), MTLTable(), BoundingBox(..),
                                    createModel, createMTLTable) where
 
 
@@ -74,9 +75,10 @@ module Southpaw.WaveFront.Parsers (parseOBJ, parseMTL,
 -- We'll need these
 ---------------------------------------------------------------------------------------------------
 import Data.List   (groupBy, unzip4)
-import Data.Maybe  (listToMaybe)
+import Data.Maybe  (listToMaybe, catMaybes)
 import Data.Either (rights)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Text.Read     (readMaybe, readEither)
 import Control.Monad (liftM)
@@ -192,12 +194,16 @@ data Material = Material { ambient :: Colour, diffuse :: Colour, specular :: Col
 --
 data Model = Model { vertices  :: [Vector Float],
                      normals   :: [Vector Float],
-                     textures  :: [Point  Float],
+                     texcoords :: [Point  Float],
                      faces     :: [Face],
                      materials :: MTLTable, -- TODO: Type synonym (?)
                      groups    :: Map.Map [String] (Int, Int), -- TODO: Type synonym
                      objects   :: Map.Map [String] (Int, Int)  -- TODO: Type synonym
                    } deriving (Show)
+
+
+-- |
+data BoundingBox n = BoundingBox { left :: n, right :: n, top :: n, bottom :: n, front :: n, back :: n }
 
 
 
@@ -248,6 +254,7 @@ parseOBJRow ln = parseTokenWith ln $ \ (attr:values) -> case attr:values of
     ["usemtl", mtl]    -> Right . UseMTL $ mtl                                  --
     _                  -> Left ln                                               -- TODO More informative errors
     where ivertex [svi, sti, sni] = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, readMaybe sni) -- TODO: Refactor, simplify
+          ivertex [svi, sti]      = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, Nothing)       -- TODO: Refactor, simplify
           ivertex is              = Left  $ "Face vertex with too many indices: " ++ show is              -- This value will simply be discarded by the "f" case
 
 
@@ -383,22 +390,40 @@ createModel :: OBJ -> MTLTable -> Model
 createModel tokens thematerials = let modeldata  = rights $ map second tokens -- TODO: Vat do vee du viz ze dissidents, kommandant?
                                   in Model { vertices  = [ (x, y, z) | OBJVertex  x y z <- modeldata ],
                                              normals   = [ (x, y, z) | OBJNormal  x y z <- modeldata ],
-                                             textures  = [ (x, y)    | OBJTexture x y   <- modeldata ],
+                                             texcoords = [ (x, y)    | OBJTexture x y   <- modeldata ],
                                              faces     = map tessellate . rights $ facesOf modeldata thematerials,
                                              groups    = groupsOf  modeldata,
                                              objects   = objectsOf modeldata,
                                              materials = thematerials }
 
 
+-- |
+-- data Attributes = Attributes {
+  -- vertexdata   :: Vertices
+  -- texcoorddata :: TexCoords
+-- }
+
+-- newtype Vertices  = Vertices  [Vector Float]
+-- newtype TexCoords = TexCoords [Maybe (Point Float)]
+-- newtype Normals   = Normals   [Maybe (Vector Float)]
+-- newtype Materials = Materials [Material]
+
+type Vertices  = [Vector Float]
+type TexCoords = [Maybe (Point Float)]
+type Normals   = [Maybe (Vector Float)]
+type Materials = [Material]
+
+
 -- | Extracts vertex, normal, texture and material data from a model
 -- TODO: Figure out how to deal with missing indices
-modelAttributes :: Model -> ([Vector Float], [Maybe (Point Float)], [Maybe (Vector Float)], [Material]) 
+modelAttributes :: Model -> (Vertices, TexCoords, Normals, Materials) 
 modelAttributes model = unzip4 $ concat [ map (attributesAt mat) theindices | Face { material=mat, indices=theindices } <- faces model]
   where
-    vertexAt   = (vertices model !!)         . subtract 1 -- 
-    normalAt   = liftM $ (normals model  !!) . subtract 1 -- 
-    texcoordAt = liftM $ (textures model !!) . subtract 1 -- 
+    vertexAt   = (vertices model !!)          . subtract 1 -- 
+    normalAt   = liftM $ (normals   model !!) . subtract 1 -- 
+    texcoordAt = liftM $ (texcoords model !!) . subtract 1 -- 
     attributesAt mat (vi, ti, ni) = (vertexAt vi, texcoordAt ti, normalAt ni, mat)
+    -- collect (vs, ts, ns, mats)    = (Vertices vs, TexCoords ts, Normals ns, Materials mats)
 
 
 -- |
@@ -412,3 +437,25 @@ tessellate face@(Face { indices=ind }) = face { indices=triangles ind }
 
 -- |
 -- unpackModelAttributes :: 
+
+
+-- |
+boundingbox :: Model -> BoundingBox Float
+boundingbox model = BoundingBox { left=minx, right=maxx, bottom=miny, top=maxy, front=maxz, back=minz }
+  where
+    minmax (v:alues) = foldr (\val acc -> (min val (fst acc), max val (snd acc))) (v, v) alues
+    (minx, maxx) = minmax . map (\(x, _, _) -> x) $ vertices model
+    (miny, maxy) = minmax . map (\(_, y, _) -> y) $ vertices model
+    (minz, maxz) = minmax . map (\(_, _, z) -> z) $ vertices model -- TODO: Make sure the order is right
+
+
+-- Model queries ----------------------------------------------------------------------------------
+-- |
+hasTextures :: Model -> Bool
+hasTextures =  not . Set.null . textures -- (/= Nothing)
+
+
+-- | All texture names as a list
+-- TODO: Wrap in ;aybe (instead of empty list) (?)
+textures :: Model -> Set.Set String
+textures = Set.fromList . catMaybes . map texture . concatMap Map.elems . Map.elems . materials
