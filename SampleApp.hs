@@ -57,7 +57,7 @@ import Foreign.C.Types
 -- import qualified Data.Vector.Storable as V
 
 import Data.Maybe    (catMaybes)
--- import Data.Either   (rights, lefts)
+import Data.Either   (rights, lefts)
 import qualified Data.Map as Map
 
 import Text.Printf (printf)
@@ -143,29 +143,20 @@ render stateref meshes window = do
 
 	let (cols, rows) = (5,5) :: (Int, Int)
 	gridM cols rows $ \ wxi wyi -> do
-		let (cx, cy) = (cint cxi, cint cyi)
-		    left     = ((wxi-1)*div cx cols)
-		    top      = ((wyi-1)*div cy rows)
-		    width    = (div cx cols)
-		    height   = (div cy rows)
-		    (x, y, z) = (8.5*float (wxi-1), 8.5*float (wyi-1) + 6*float ry/float cyi, 6*float rx/float cxi)
+		let (cx, cy)  = (cint cxi, cint cyi)
+		    left      = (wxi-1)*div cx cols
+		    top       = (wyi-1)*div cy rows
+		    width     = div cx cols
+		    height    = div cy rows
+		    (modeldx, modeldy) = let bounds = Mesh.bounds $ head meshes in (WF.right bounds - WF.left bounds,
+		                                                                    WF.top bounds   - WF.bottom bounds)
+		    (x, y, z) = (1.2*modeldx*float (wxi-1), 1.2*modeldy*float (wyi-1) + 6*float ry/float cyi, 6*float rx/float cxi)
 		    modelview = (identity) & (translation .~ ((V3 x y z) - (Mesh.centre $ head meshes)))
 		    setModelview mesh = mesh { Mesh.uniforms=Map.update (\(loc, _) -> Just (loc, UMatrix44 modelview)) "uMVMatrix" (Mesh.uniforms mesh) }
-
-		-- clearColor $= Color4 (min 1.0 $ 0.5*float (wxi-1)) (min 1.0 $ 0.5*float (wyi-1)) (min 1.0 $ float (wxi-1)*float (wyi-1)*0.3) (1.0 :: GLfloat)
-		-- viewport   $= (Position left top, Size width height)
-		-- scissor    $= Just (Position left top, Size width height)
-
-		-- TODO: Use lenses, move animation logic to separate function (cf. Entity)
-		-- (V3 0.0 (6*float ry/float cyi) (6*float rx/float cxi)) (V3 0 (2 * pi * float ry/float cyi) 0)
-		-- let rotatation = rotateY ((2*π * float ry/float cyi) :: Float)
-		-- let modelview = (identity) & (translation .~ (V3 0.0 0.0 (4.0)))
-		-- print (V3 0.0 (6*float ry/float cyi) (6*float rx/float cxi))
 		forM_ meshes (Mesh.renderMesh . setModelview)
 
 	-- Text
 	-- helloworld
-	-- color3f (Color4 1.0 0.2 1.0 (1.0 :: Float))
 	GLFW.swapBuffers window
 	throwError
 
@@ -211,9 +202,12 @@ createMesh chooseProgram model = do
 	    cz     = WF.back   bounds + depth  / 2
 
 	printf "Width=%.02f, Height=%.02f, Depth=%.02f, Centre=(%.02f, %.02f, %.02f)\n" width height depth cx cy cz
-	printf "TS: %s\n" . show $  take 10 (catMaybes ts)
-	printf "VS: %s\n" . show $  take 10 (vs)
-	printf "VS: %s\n" . show $  take 10 (WF.vertices model)
+	printf "VS: %s.\n" . show $ vs
+	printf "TS: %s.\n" . show $ ts
+
+	printf "VS: %s.\n" . show . take 10 $ WF.vertices  model
+	printf "F:  %s.\n" . show . take 10 $ WF.faces model
+
 	if WF.hasTextures model
 		then createTexturedMesh (chooseProgram model) (vertices, texcoords) (model) (V3 cx cy cz) --
 		else createPaintedMesh  (chooseProgram model) (vertices, ms)        (model) (V3 cx cy cz) --  
@@ -325,7 +319,7 @@ defaultMatrixUniforms theprogram = do
 
 	-- TODO: Experiment with inverse perspective
 	let modelview  = (rotateY (0.0 :: Float) !*! identity) & (translation .~ (V3 0 0 0))
-	let projection = (perspective
+	    projection = (perspective
 	                   (radians 40.0) -- FOV (y direction, in radians)
 	                   1.0            -- Aspect ratio
 	                   1.0            -- Near plane
@@ -377,6 +371,7 @@ onwindowresize stateref _ cx cy = do
 ---------------------------------------------------------------------------------------------------
 
 -- | Like maybe, except the function comes last
+-- TODO: Deport to Siber... I mean move to Utilities module
 perhaps :: b -> Maybe a -> (a -> b) -> b
 perhaps fallback value action = maybe fallback action value
 

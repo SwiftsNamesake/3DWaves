@@ -255,6 +255,7 @@ parseOBJRow ln = parseTokenWith ln $ \ (attr:values) -> case attr:values of
     _                  -> Left ln                                               -- TODO More informative errors
     where ivertex [svi, sti, sni] = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, readMaybe sni) -- TODO: Refactor, simplify
           ivertex [svi, sti]      = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, Nothing)       -- TODO: Refactor, simplify
+          ivertex [svi]           = readEither svi >>= \ vi -> Right $ (vi, Nothing,       Nothing)       -- TODO: Refactor, simplify
           ivertex is              = Left  $ "Face vertex with too many indices: " ++ show is              -- This value will simply be discarded by the "f" case
 
 
