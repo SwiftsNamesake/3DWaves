@@ -77,6 +77,7 @@ module Southpaw.WaveFront.Parsers (parseOBJ, parseMTL,
 import Data.List   (groupBy, unzip4)
 import Data.Maybe  (listToMaybe, catMaybes)
 import Data.Either (rights)
+import Data.Char   (isSpace)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -114,9 +115,14 @@ data OBJToken = OBJVertex  Float Float Float          |
 
 
 -- |
+-- TODO: Rename (?)
+data OBJNoParse = OBJComment String | OBJEmpty | OBJNoSuchAttribute String | OBJNoParse String
+
+
+-- |
 -- TODO: Use error type instead of String, allowing us to distinguish invalid data
 --       from eg. comments and blank lines (?)
-type OBJRow = (Either String OBJToken, String)
+type OBJRow = (Int, Either OBJNoParse OBJToken, String)
 
 
 -- | Output type of the OBJ parser. Currently a list of line number and token (or error string) pairs
@@ -124,7 +130,7 @@ type OBJRow = (Either String OBJToken, String)
 -- TODO: Rename (?)
 -- TODO: Use Integral for line number (?)
 --
-type OBJ = [(Int, Either String OBJToken, String)]
+type OBJ = [OBJRow]
 
 
 -- MTL parser types -------------------------------------------------------------------------------
@@ -137,20 +143,25 @@ data MTLToken = Ambient  Float Float Float (Maybe Float) | -- Ka
                 Diffuse  Float Float Float (Maybe Float) | -- Kd
                 Specular Float Float Float (Maybe Float) | -- Ks
 
-        MapDiffuse  String | -- map_Kd
-        NewMaterial String   -- newmtl
-        deriving (Eq, Show)
+                MapDiffuse  String | -- map_Kd
+                NewMaterial String   -- newmtl
+                deriving (Eq, Show)
+
+
+-- |
+-- TODO: Rename (?)
+data MTLNoParse = MTLComment String | MTLEmpty | MTLNoSuchAttribute String | MTLNoParse String
 
 
 -- | Output type of the single-row MTL parser.
-type MTLRow = (Either String MTLToken, String)
+type MTLRow = (Int, Either MTLNoParse MTLToken, String)
 
 
 -- | Output type of the MTL parser. Currently a list of line number and token (or error string) pairs
 --
 -- TODO: Add type for processed MTL (eg. a map between names and materials)
 --
-type MTL = [(Int, Either String MTLToken, String)] -- (line number, MTL token, comment)
+type MTL = [MTLRow] -- (line number, MTL token, comment)
 
 
 -- |
@@ -184,7 +195,6 @@ data Material = Material { ambient :: Colour, diffuse :: Colour, specular :: Col
 
 -- | Abstract representation of an OBJ model with associated MTL definitions.
 -- 
---
 -- TODO: Rename (?)
 -- TODO: Include metadata, comments, rejected data (?)
 -- TODO: Separate type for processed OBJTokens (ie. token + context)
@@ -237,26 +247,38 @@ parseOBJ = enumerate . map parseOBJRow . lines -- . rows
 -- TODO: Additional values, currently unsupported attributes (ignore?) (pattern match against the entire line, eg. ["vn", x, y, z])
 -- TODO: Dealing with MTL definitions (pass in names, MTL value, return list of MTL dependencies)
 -- TODO: Take 1-based indexing into account straight away (?)
--- TODO: Deal with absent texture and normal indices
+-- TODO: Deal with absent texture and normal indices (✓)
 -- TODO: Strip trailing comments (✓)
 -- TODO: Don't ignore leftover values (errors?) (...)
 --
-parseOBJRow :: String -> OBJRow -- Maybe OBJToken
-parseOBJRow ln = parseTokenWith ln $ \ (attr:values) -> case attr:values of
-    ("f":_:_:_:_)      -> either (Left . const ln) (Right . OBJFace) . sequence . map (ivertex . cuts '/') $ values -- Face
-    ["v",  sx, sy, sz] -> vector (\ [x, y, z] -> OBJVertex  x y z) [sx, sy, sz] -- Vertex
-    ["vn", sx, sy, sz] -> vector (\ [x, y, z] -> OBJNormal  x y z) [sx, sy, sz] -- Normal
-    ["vt", sx, sy]     -> vector (\ [x, y]    -> OBJTexture x y)   [sx, sy]     -- Texture
-    ("g":_:_)          -> Right . Group  $ values                               -- Group
-    ("o":_:_)          -> Right . Object $ values                               -- Object
-    ("s":_:_)          -> Left ln                                               -- Smooth shading
-    ["mtllib", lib]    -> Right . LibMTL $ lib                                  --
-    ["usemtl", mtl]    -> Right . UseMTL $ mtl                                  --
-    _                  -> Left ln                                               -- TODO More informative errors
-    where ivertex [svi, sti, sni] = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, readMaybe sni) -- TODO: Refactor, simplify
-          ivertex [svi, sti]      = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, Nothing)       -- TODO: Refactor, simplify
-          ivertex [svi]           = readEither svi >>= \ vi -> Right $ (vi, Nothing,       Nothing)       -- TODO: Refactor, simplify
-          ivertex is              = Left  $ "Face vertex with too many indices: " ++ show is              -- This value will simply be discarded by the "f" case
+parseOBJRow :: String -> (Int -> OBJRow) -- Maybe OBJToken
+parseOBJRow ln = parseTokenWith ln $ \ line -> let (attr:values) = words line in case (attr:values) of
+    ("f":_:_:_:_)      -> either (Left . noparse . const line) (Right . OBJFace) . sequence . map (ivertex . cuts '/') $ values -- Face
+    ["v",  sx, sy, sz] -> vector (\ [x, y, z] -> OBJVertex  x y z) [sx, sy, sz] (noparse line) -- Vertex
+    ["vn", sx, sy, sz] -> vector (\ [x, y, z] -> OBJNormal  x y z) [sx, sy, sz] (noparse line) -- Normal
+    ["vt", sx, sy]     -> vector (\ [x, y]    -> OBJTexture x y)   [sx, sy]     (noparse line) -- Texture
+    ("g":_:_)          -> Right $ Group  values                                 -- Group
+    ("o":_:_)          -> Right $ Object values                                 -- Object
+    ("s":_:_)          -> Left  $ noparse line                                  -- Smooth shading
+    ["mtllib", lib]    -> Right $ LibMTL lib                                    -- 
+    ["usemtl", mtl]    -> Right $ UseMTL mtl                                    -- 
+    _                  -> Left  $ noparse line                                  -- TODO: More informative errors
+    where
+      -- ivertex :: [String] -> Either OBJNoParse OBJToken
+      ivertex [svi, sti, sni] = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, readMaybe sni) -- TODO: Refactor, simplify
+      ivertex [svi, sti]      = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, Nothing)       -- TODO: Refactor, simplify
+      ivertex [svi]           = readEither svi >>= \ vi -> Right $ (vi, Nothing,       Nothing)       -- TODO: Refactor, simplify
+      ivertex _               = Left ln
+
+      noparse line
+        | null line || all isSpace line = OBJEmpty
+        | isComment line                = OBJComment line
+        | otherwise                     = OBJNoParse line
+
+
+-- | Returns a list of annotated parsing errors or the original OBJ data structure if 
+-- validateOBJ :: OBJ -> Either [OBJNoParse] OBJ
+-- validateOBJ _ = undefined
 
 
 -- MTL parsing ------------------------------------------------------------------------------------
@@ -271,18 +293,23 @@ parseMTL = enumerate . map parseMTLRow . lines
 -- TOOD: Process the MTL tokens (✗)
 -- TODO: cf. parseOBJRow
 --
-parseMTLRow :: String -> MTLRow
-parseMTLRow ln = parseTokenWith ln $ \ (which:values) -> case which:values of
-    ("Ka":sr:sg:sb:rest) -> withChannels Ambient  sr sg sb rest -- Ka
-    ("Kd":sr:sg:sb:rest) -> withChannels Diffuse  sr sg sb rest -- Kd
-    ("Ks":sr:sg:sb:rest) -> withChannels Specular sr sg sb rest -- Ks
-    ["map_Kd", name]     -> Right $ MapDiffuse  name            -- map_Kd
-    ["newmtl", name]     -> Right $ NewMaterial name            -- newmtl
-    _                    -> Left ln                             -- 
-    where withChannels f sr sg sb []   = vector (\[r, g, b] -> f r g b Nothing) [sr, sg, sb]        -- TODO: Refactor, simplify
-          withChannels f sr sg sb [sa] = vector (\[r, g, b] -> f r g b $ readMaybe sa) [sr, sg, sb] -- TODO: Refactor, simplify
-          withChannels _ _  _  _   _   = Left "Wrong number of colour channels"
-
+parseMTLRow :: String -> (Int -> MTLRow)
+parseMTLRow ln = parseTokenWith ln $ \ line  -> let (which:values) = words line in case which:values of
+    ("Ka":sr:sg:sb:rest) -> withChannels Ambient  sr sg sb rest line -- Ka
+    ("Kd":sr:sg:sb:rest) -> withChannels Diffuse  sr sg sb rest line -- Kd
+    ("Ks":sr:sg:sb:rest) -> withChannels Specular sr sg sb rest line -- Ks
+    ["map_Kd", name]     -> Right $ MapDiffuse  name                 -- map_Kd
+    ["newmtl", name]     -> Right $ NewMaterial name                 -- newmtl
+    _                    -> Left  $ noparse line                     -- 
+    where
+      withChannels f sr sg sb []   line = vector (\[r, g, b] -> f r g b Nothing)        [sr, sg, sb] (noparse line) -- TODO: Refactor, simplify
+      withChannels f sr sg sb [sa] line = vector (\[r, g, b] -> f r g b $ readMaybe sa) [sr, sg, sb] (noparse line) -- TODO: Refactor, simplify
+      withChannels _ _  _  _   _   line = Left $ noparse line
+      
+      noparse line
+        | null line || all isSpace line = MTLEmpty
+        | isComment line                = MTLComment line
+        | otherwise                     = MTLNoParse line
 
 -- Parser output churners (OBJ) -------------------------------------------------------------------
 -- | Creates a mapping between group names and the corresponding bounds ([lower, upper)). Invalid

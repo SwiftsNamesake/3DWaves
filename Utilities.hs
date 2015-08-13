@@ -34,16 +34,18 @@ import Text.Read (readEither)
 -- Functions
 ---------------------------------------------------------------------------------------------------
 -- Parsing utilities ------------------------------------------------------------------------------
--- |
-parseTokenWith :: String -> ([String] -> Either String a) -> (Either String a, String)
-parseTokenWith ln parse
-  | null ln || isComment ln = withoutComment ln $ Left
-  | otherwise               = withoutComment ln $ parse . words
+-- | This strikes me as overly convoluted. Should probably be refactored or removed entirely.
+parseTokenWith :: String -> (String -> Either e token) -> Int -> (Int, Either e token, String)
+parseTokenWith line parse = withoutComment line parse
 
 
--- | Predicate for determining if a String is a comment. Comments are preceded by a '#' and any
---   number of whitespace characters (not including linebreaks). Support for comments at the end
---   of a line has yet to be added.
+-- | Passes the input line (stripped of any trailing comments) to the specified parser
+withoutComment :: String -> (String -> a) -> Int -> (Int, a, String)
+withoutComment (l:ine) parse lnum = let (l:tokens, comment) = span (/= '#') ine in (lnum, parse tokens, comment)
+
+
+-- | Predicate for determining if a single line of text is a comment.
+--   Comments are preceded by a '#' and any number of whitespace characters.
 --
 -- TODO: Drop comments at the end of a line (?)
 -- TODO: Add stripComment (or extractComment) which consumes a line up until the first '#'.
@@ -63,14 +65,8 @@ takeComment = dropWhile (/= '#')
 
 
 -- |
-withoutComment :: String -> (String -> a) -> (a, String)
-withoutComment row parse = let (tokens, comment) = span (/= '#') row in (parse tokens, comment)
-
-
--- |
-enumerate :: [(token, comment)] -> [(Int, token, comment)]
-enumerate = zipWith prepend [1..]
-  where prepend n (token, comment) = (n, token, comment)
+enumerate :: [(Int -> (Int, token, comment))] -> [(Int, token, comment)]
+enumerate = zipWith (flip ($)) [1..]
 
 
 -- | Splits a string into rows and filters out unimportant elements (empty lines and comments)
@@ -87,8 +83,8 @@ rows = filter (not . satisfiesAny [null, isComment]) . lines
 -- TODO: More informative error message (?)
 -- TODO: Rename (?)
 -- TODO: Generic function for mapping and sequencing readEither (cf. "vt" case in parseOBJRow) (?)
-vector :: Read r => ([r] -> b) -> [String] -> Either String b
-vector f coords = sequence (map readEither coords) >>= Right . f
+vector :: Read r => ([r] -> b) -> [String] -> e -> Either e b
+vector f coords e = either (Left . const e) (Right) (sequence (map readEither coords) >>= Right . f)
 -- vector _ _      = Left  $ "Wrong number of coordinates for vector"
 
 
