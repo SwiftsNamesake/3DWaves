@@ -29,7 +29,7 @@ import System.IO (hFlush, stdout)
 
 import Control.Monad (forM_, when)
 
-import Southpaw.WaveFront.Parsers (MTL, OBJ)
+import Southpaw.WaveFront.Parsers (MTL, OBJ, OBJNoParse(..), MTLNoParse(..), MTLToken(..))
 import Southpaw.WaveFront.Load    (loadOBJ, loadMTL)
 
 
@@ -75,7 +75,7 @@ askPerformAction q action = do
 
 
 -- |
-showTokens :: Show a => [(Int, Either String a, String)] -> IO ()
+showTokens :: Show a => [(Int, Either MTLNoParse a, String)] -> IO ()
 showTokens materials = mapM_ (uncurry $ printf "[%d] %s\n") [ (n, show token) | (n, Right token, comment) <- materials ] -- TODO: cf. line 65
 
 
@@ -101,8 +101,8 @@ main = do
     -- TODO: Oh, the efficiency!
     -- TODO: Less ugly naming convention for monadic functions which ignore the output (cf. mapM_, forM_, etc.)
     let unparsed = lefts $ map second model
-    let comments = filter ('#' `elem`) unparsed
-    let blanks   = filter null unparsed
+    let comments = [ c | c@(OBJComment _) <- unparsed ]
+    let blanks   = [ c | c@(OBJEmpty)     <- unparsed ]
     let errors   = length unparsed - (length comments + length blanks)
     printf "Found %d invalid rows in OBJ file (%d comments, %d blanks, %d errors).\n" (length unparsed) (length comments) (length blanks) errors
     when (length unparsed > 0) . askPerformAction "Would you like to see view them (yes/no)? " $ putStrLn "Ok, here they are:" >> mapM_ print unparsed

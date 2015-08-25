@@ -38,7 +38,7 @@ import System.IO       (hFlush, stdout)
 
 import Data.Either (rights, isLeft)
 
-import Southpaw.WaveFront.Parsers
+import Southpaw.WaveFront.Parsers    (parseOBJ, parseMTL, createMTLTable, createModel, OBJ(), MTL(), MTLTable(), OBJToken(LibMTL), Model())
 import Southpaw.WaveFront.Utilities
 
 

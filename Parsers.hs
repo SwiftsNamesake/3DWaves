@@ -66,7 +66,7 @@ module Southpaw.WaveFront.Parsers (parseOBJ, parseMTL,
                                    facesOf,  materialsOf,
                                    modelAttributes, tessellate, boundingbox,
                                    hasTextures, textures,
-                                   MTL(), OBJ(), Model(..), Face(..), Material(..), OBJToken(..), MTLToken(..), MTLTable(), BoundingBox(..),
+                                   MTL(), OBJ(), Model(..), Face(..), Material(..), OBJToken(..), MTLToken(..), MTLTable(..), BoundingBox(..), OBJNoParse(..), MTLNoParse(..),
                                    createModel, createMTLTable) where
 
 
@@ -116,7 +116,7 @@ data OBJToken = OBJVertex  Float Float Float          |
 
 -- |
 -- TODO: Rename (?)
-data OBJNoParse = OBJComment String | OBJEmpty | OBJNoSuchAttribute String | OBJNoParse String
+data OBJNoParse = OBJComment String | OBJEmpty | OBJNoSuchAttribute String | OBJNoParse String deriving (Show)
 
 
 -- |
@@ -150,7 +150,7 @@ data MTLToken = Ambient  Float Float Float (Maybe Float) | -- Ka
 
 -- |
 -- TODO: Rename (?)
-data MTLNoParse = MTLComment String | MTLEmpty | MTLNoSuchAttribute String | MTLNoParse String
+data MTLNoParse = MTLComment String | MTLEmpty | MTLNoSuchAttribute String | MTLNoParse String deriving (Show)
 
 
 -- | Output type of the single-row MTL parser.
