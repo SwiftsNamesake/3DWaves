@@ -6,7 +6,7 @@
 -- Maintainer  : Jonatan H Sundqvist
 -- Stability   : experimental|stable
 -- Portability : POSIX (not sure)
--- 
+--
 
 -- Created July 15 2015
 
@@ -43,7 +43,6 @@ import Linear.V3
 import Linear.Projection
 -- import Linear.Quaternion
 
-import System.Directory (doesDirectoryExist, getDirectoryContents)
 import System.FilePath  (splitExtension, (</>))
 import System.IO        (hFlush, stdout)
 
@@ -67,22 +66,26 @@ import Data.IORef
 import qualified Data.Set as Set
 
 import Southpaw.Utilities.Utilities (gridM, radians) --, π)
+import Southpaw.Interactive.Console (chooseFilesFromDirectory)
 
 import qualified Southpaw.WaveFront.Parsers    as WF      -- (loadModel, loadOBJ, loadMTL, facesOf, Model(..), Face(..), OBJToken(..), Material(..))
-import qualified Southpaw.WaveFront.Load       as WFL     -- 
+import qualified Southpaw.WaveFront.Load       as WFL     --
+
 
 import           Southpaw.Michelangelo.Transformations    --
-import           Southpaw.Michelangelo.Mesh (Mesh(..))    -- 
-import qualified Southpaw.Michelangelo.Mesh    as Mesh    -- 
-import qualified Southpaw.Michelangelo.Shaders as Shaders -- 
-import           Southpaw.Michelangelo.Shaders (UniformValue(..)) -- 
+import           Southpaw.Michelangelo.Mesh (Mesh(..))    --
+import qualified Southpaw.Michelangelo.Mesh    as Mesh    --
+import qualified Southpaw.Michelangelo.Shaders as Shaders --
+import           Southpaw.Michelangelo.Shaders (UniformValue(..)) --
+
+import Southpaw.Interactive.Console (untilM, clamped, perhaps) -- TODO: These functions should be imported from some sensibly named utility module instead
 
 
 
 ---------------------------------------------------------------------------------------------------
 -- Types
 ---------------------------------------------------------------------------------------------------
--- | 
+-- |
 type Buffers = [(Normal3 GLfloat, WF.Material, [Vertex3 GLfloat])]
 data AppState = AppState { _rotation :: (Double, Double), _mouse :: Maybe (Double, Double), _clientsize :: (Int, Int), _frame :: Int } deriving (Show)
 
@@ -91,7 +94,7 @@ data AppState = AppState { _rotation :: (Double, Double), _mouse :: Maybe (Doubl
 ---------------------------------------------------------------------------------------------------
 -- Functions
 ---------------------------------------------------------------------------------------------------
--- | 
+-- |
 initOpenGL :: IO ()
 initOpenGL = do
 
@@ -184,7 +187,7 @@ helloworld = do
 	FTGL.renderFont font "Hola Mundo!" FTGL.Front
 
 
--- | 
+-- |
 -- TODO: Use index buffer (?)
 -- TODO: Texture support
 -- TODO: More flexible treatment of 'programs'
@@ -210,12 +213,12 @@ createMesh chooseProgram model = do
 
 	if WF.hasTextures model
 		then createTexturedMesh (chooseProgram model) (vertices, texcoords) (model) (V3 cx cy cz) --
-		else createPaintedMesh  (chooseProgram model) (vertices, ms)        (model) (V3 cx cy cz) --  
+		else createPaintedMesh  (chooseProgram model) (vertices, ms)        (model) (V3 cx cy cz) --
 	where
 	  (vs, ts, _, ms) = WF.modelAttributes model
-	  texcoords        = concat $ ([ map realToFrac [x, y]    | (x, y)    <- catMaybes ts] :: [[CFloat]]) -- 
-	  vertices         = concat $ ([ map realToFrac [x, y, z] | (x, y, z) <- vs]           :: [[CFloat]]) -- 
-	  -- normals          = concat $ ([ map realToFrac [xs, y, z] | (x, y, z) <- ns]           :: [[CFloat]]) -- 
+	  texcoords        = concat $ ([ map realToFrac [x, y]    | (x, y)    <- catMaybes ts] :: [[CFloat]]) --
+	  vertices         = concat $ ([ map realToFrac [x, y, z] | (x, y, z) <- vs]           :: [[CFloat]]) --
+	  -- normals          = concat $ ([ map realToFrac [xs, y, z] | (x, y, z) <- ns]           :: [[CFloat]]) --
 
 
 -- |
@@ -224,13 +227,13 @@ createMesh chooseProgram model = do
 -- TODO: Default to painted when the textures fail to load (?)
 createTexturedMesh :: Program -> ([CFloat], [CFloat]) -> WF.Model -> V3 Float -> IO Mesh.Mesh
 createTexturedMesh theprogram (vs, ts) model centre = do
-	
+
 	putStrLn "Creating textured mesh"
-	vertexbuffer   <- makeBuffer ArrayBuffer $ vs -- 
-	texcoordbuffer <- makeBuffer ArrayBuffer $ ts -- 
+	vertexbuffer   <- makeBuffer ArrayBuffer $ vs --
+	texcoordbuffer <- makeBuffer ArrayBuffer $ ts --
 	putStrLn "Finished creating mesh buffers"
 
-	[locv, loct] <- mapM (get . attribLocation theprogram) [("aVertexPosition"), ("aTexCoord")] -- 
+	[locv, loct] <- mapM (get . attribLocation theprogram) [("aVertexPosition"), ("aTexCoord")] --
 
 	printError
 	etextures <- liftM sequence $ mapM (readTexture . ("C:\\Users\\Jonatan\\Desktop\\3D\\models\\textures" </>)) (Set.toList $ WF.textures model) -- TODO: This could fail
@@ -292,7 +295,7 @@ createPaintedMesh theprogram (vs, cs) model centre = do
 	[locv, locc] <- mapM (get . attribLocation theprogram) ["aVertexPosition", "aVertexColor"] --
 
 	vertexbuffer <- makeBuffer ArrayBuffer $ vs
-	colourbuffer <- makeBuffer ArrayBuffer . concat $ ([ map realToFrac [r, g, b, a] | (r, g, b, a) <- map WF.diffuse cs] :: [[CFloat]]) -- 
+	colourbuffer <- makeBuffer ArrayBuffer . concat $ ([ map realToFrac [r, g, b, a] | (r, g, b, a) <- map WF.diffuse cs] :: [[CFloat]]) --
 
 	-- Uniforms
 	uniforms <- liftM Map.fromList $ defaultMatrixUniforms theprogram
@@ -330,7 +333,7 @@ defaultMatrixUniforms theprogram = do
 
 -- Events -----------------------------------------------------------------------------------------
 
--- | 
+-- |
 -- animate fps = do
 	-- postRedisplay Nothing
 	-- addTimerCallback (div 1000 fps) (animate fps)
@@ -368,36 +371,6 @@ onwindowresize stateref _ cx cy = do
 	-- viewport $= (Position 0 0, Size (fromIntegral cx) (fromIntegral cy)) --
 	putStrLn $ unwords ["Window size is", show cx, "/", show cy]
 
----------------------------------------------------------------------------------------------------
-
--- | Like maybe, except the function comes last
--- TODO: Deport to Siber... I mean move to Utilities module
-perhaps :: b -> Maybe a -> (a -> b) -> b
-perhaps fallback value action = maybe fallback action value
-
-
--- | Monadic ternary operator
--- TOOD: Rename
-assumingM :: Monad m => m Bool -> m a -> m a -> m a
-assumingM p a b = p >>= \ done -> if done then a else b
-
-
--- | Perform an action until the returned value satisfies the condition
--- TODO: Pass in previous result (✓)
--- TODO: Refactor, rename variables (?)
--- TODO: Move to separate module (eg. loops/control structures) (?)
-untilM :: Monad m => (a -> m Bool) -> (a -> m a) -> m a -> m a
-untilM p f x = do
-	value <- x 
-	done  <- p value
-	if done
-	  then return value
-	  else untilM p f (f value)
-
-
--- | a ∈ [low, upp]
-clamped low upp a = (low <= a) && (a <= upp) 
-
 
 ---------------------------------------------------------------------------------------------------
 
@@ -425,12 +398,9 @@ showOpenGLInformation = do
 ---------------------------------------------------------------------------------------------------
 
 -- |
+-- TODO: Move to module
 listOBJFiles :: String -> IO (Either String [String])
-listOBJFiles path = do
-	exists <- doesDirectoryExist path
-	if exists
-	  then getDirectoryContents path >>= return . Right . map (path </>) . filter ((==".obj") . snd . splitExtension)
-	  else return (Left "No such directory")
+listOBJFiles path = chooseFilesFromDirectory path (==".obj")
 
 
 -- |
@@ -443,10 +413,10 @@ chooseModelsFrom path = do
 		mapM option $ zip ([1..] :: [Int]) paths
 		choice <- untilM (valid paths) (const $ prompt "That doesn't work. Try again: ") (prompt "Choose one: ")
 		return $ case choice of
-			Just index -> Right $ paths !! (index-1) -- 
+			Just index -> Right $ paths !! (index-1) --
 			Nothing    -> Left  $ "Invalid choice"   -- This should never happen, throw error instead (?)
 	where
-		valid paths = return . maybe False (clamped 0 (length paths) . (subtract 1)) -- 
+		valid paths = return . maybe False (clamped 0 (length paths) . (subtract 1)) --
 		prompt q    = putStr q >> hFlush stdout >> (liftM readMaybe) getLine         -- Ask for input (flush is sometimes required when q doesn't end in a newline)
 		possibly f x g   = either f g x                                              -- Do-block at the end instead of in the middle
 		option (n, path) = printf "  [%d] %s\n" n path                               -- Prints a model option
@@ -491,7 +461,7 @@ openGLMain = do
 		-- GLFW.addTimerCallback (div 100 30) (animate 30)
 
 		initOpenGL                --
-		eprograms <- loadPrograms -- TODO: Don't make assumptions about the order of shaders		
+		eprograms <- loadPrograms -- TODO: Don't make assumptions about the order of shaders
 
 		-- GLFW.pollEvents -- mainLoop
 		either
