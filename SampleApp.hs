@@ -465,7 +465,7 @@ openGLMain = do
 
 		-- GLFW.pollEvents -- mainLoop
 		either
-		  (\ err                 -> printf "Sumtin baay-uhd happened (%s). Bailing out...\n" (unlines err))
+		  (printf "Sumtin baay-uhd happened (%s). Bailing out...\n" . unlines)
 		  (\ [painted, textured] -> do
 		    meshes <- mapM (createMesh (\ _ -> if WF.hasTextures model then textured else painted)) [model]
 		    mainloop window stateref meshes)
@@ -477,10 +477,10 @@ openGLMain = do
 
 	putStrLn "Finished"
 	mapM_ putStrLn ["Finished painting.",
-					"Washing brushes...",
-					"Mounting canvas...",
-					"Disassembling easel...",
-					"Done. Good bye!"]
+     					    "Washing brushes...",
+     					    "Mounting canvas...",
+     					    "Disassembling easel...",
+     					    "Done. Good bye!"]
 
 
 -- |
