@@ -1,4 +1,5 @@
 *.sublime-workspace
+.stack-work/
 !dist/
 dist/*
 !dist/doc
