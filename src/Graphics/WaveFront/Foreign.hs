@@ -1,10 +1,13 @@
---
--- Wavefront - Foreign.hs
--- Foreign function interface
---
--- Jonatan H Sundqvist
+-- |
+-- Module      : Graphics.WaveFront.Foreign
+-- Description : Foreign function interface
+-- Copyright   : (c) Jonatan H Sundqvist, 2015
+-- License     : MIT
+-- Maintainer  : Jonatan H Sundqvist
+-- Stability   : experimental|stable
+-- Portability : POSIX (not sure)
+
 -- February 24 2015
---
 
 -- TODO | - Possible to get rid of newtypes
 --        - Decide on an API
@@ -13,11 +16,15 @@
 --        -
 
 
+
 -- TODO: Why do same extensions start with 'X'?
 {-# LANGUAGE ForeignFunctionInterface #-}
 
 
 
+--------------------------------------------------------------------------------------------------------------------------------------------
+-- API
+--------------------------------------------------------------------------------------------------------------------------------------------
 module Graphics.WaveFront.Foreign where
 
 

@@ -1,5 +1,5 @@
 -- |
--- Module      : Southpaw.WaveFront.Load
+-- Module      : Graphics.WaveFront.Load
 -- Description : Loading (and perhaps writing) OBJ and MTL files
 -- Copyright   : (c) Jonatan H Sundqvist, 2015
 -- License     : MIT

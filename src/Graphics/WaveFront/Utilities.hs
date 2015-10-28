@@ -1,5 +1,5 @@
 -- |
--- Module      : Southpaw.WaveFront.Utilities
+-- Module      : Graphics.WaveFront.Utilities
 -- Description : Parsing utilities
 -- Copyright   : (c) Jonatan H Sundqvist, 2015
 -- License     : MIT

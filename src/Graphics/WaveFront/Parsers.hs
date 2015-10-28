@@ -1,5 +1,5 @@
 -- |
--- Module      : Southpaw.WaveFront.Parsers
+-- Module      : Graphics.WaveFront.Parsers
 -- Description : descr
 -- Copyright   : (c) Jonatan H Sundqvist, February 8 2015
 -- License     : MIT
