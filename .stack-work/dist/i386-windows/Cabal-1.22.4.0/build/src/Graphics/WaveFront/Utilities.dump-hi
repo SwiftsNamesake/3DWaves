@@ -1,0 +1,336 @@
+
+==================== FINAL INTERFACE ====================
+2015-10-28 21:49:20.2133386 UTC
+
+interface WaveF_Bmgqj22QsG4JDYPIKvoJPR:Graphics.WaveFront.Utilities 7102
+  interface hash: 9e599e09b0345cc0fc012750ac69ddb5
+  ABI hash: 948a660dfd3934c1040754db3ed68d48
+  export-list hash: 778c00db3122d57636e4c4b8cc21f154
+  orphan hash: 693e9af84d3dfcc71e640e005bdc5e2e
+  flag hash: 3d55c2ccab0e0f2ffb653a81152f40b9
+  sig of: Nothing
+  used TH splices: False
+  where
+exports:
+  Graphics.WaveFront.Utilities.cuts
+  Graphics.WaveFront.Utilities.dropComment
+  Graphics.WaveFront.Utilities.enumerate
+  Graphics.WaveFront.Utilities.isComment
+  Graphics.WaveFront.Utilities.pairwise
+  Graphics.WaveFront.Utilities.parseTokenWith
+  Graphics.WaveFront.Utilities.rows
+  Graphics.WaveFront.Utilities.second
+  Graphics.WaveFront.Utilities.splitWith
+  Graphics.WaveFront.Utilities.takeComment
+  Graphics.WaveFront.Utilities.third
+  Graphics.WaveFront.Utilities.vector
+  Graphics.WaveFront.Utilities.withoutComment
+module dependencies:
+package dependencies: base-4.8.1.0* ghc-prim-0.4.0.0
+                      integer-gmp-1.0.0.0
+orphans: base-4.8.1.0:GHC.Base base-4.8.1.0:GHC.Float
+family instance modules: base-4.8.1.0:Control.Applicative
+                         base-4.8.1.0:Data.Either base-4.8.1.0:Data.Monoid
+                         base-4.8.1.0:Data.Type.Equality base-4.8.1.0:GHC.Generics
+import  -/  base-4.8.1.0:Data.Char fed1fa33e52ac848a587560e982bba77
+import  -/  base-4.8.1.0:Data.Either ed72211389ff44c6b97fe41b7de5ee25
+import  -/  base-4.8.1.0:Data.Foldable ffb6688acc4613dcd183df2b082c7d83
+import  -/  base-4.8.1.0:Data.List df6095186dd0ce29e5b3971627965383
+import  -/  base-4.8.1.0:Data.OldList 74dbdac9598e3a4ba669f9246f2946a3
+import  -/  base-4.8.1.0:Data.Traversable b7bf5f51fbf095c7e228e0d2ad343874
+import  -/  base-4.8.1.0:GHC.Base ab3ff5d7de26c5c2e08d2bb04c08d54e
+import  -/  base-4.8.1.0:GHC.List 02106028900ccbc904f69e4d283d08b6
+import  -/  base-4.8.1.0:GHC.Read 1a1042d130eba12603236593fcead2b8
+import  -/  base-4.8.1.0:GHC.Unicode bed09d5db094d4196c8520e6b25efaa4
+import  -/  base-4.8.1.0:Prelude b9582be64b377d041643bc0573e05e36
+import  -/  base-4.8.1.0:Text.Read 235672868e760c109e0b13caf9e360b2
+import  -/  ghc-prim-0.4.0.0:GHC.Classes e1f4ff80f7b5262008a595d29986fb18
+464d49339f2d9d496503acb2f69fb44b
+  $wsplitWith :: ([a] -> ([a], [a])) -> [a] -> [[a]]
+  {- Arity: 2, HasNoCafRefs, Strictness: <L,C(U(U,1*U))><S,1*U>,
+     Inline: [0],
+     Unfolding: (\ @ a w :: [a] -> ([a], [a]) w1 :: [a] ->
+                 letrec {
+                   go1 :: [a] -> [[a]] {- Arity: 1, Strictness: <S,1*U> -}
+                   = \ b2 :: [a] ->
+                     case b2 of wild {
+                       [] -> GHC.Types.[] @ [a]
+                       : ipv ipv1
+                       -> case w wild of wild1 { (,) a1 new_b ->
+                          GHC.Types.: @ [a] a1 (go1 new_b) } }
+                 } in
+                 go1 w1) -}
+153fd584a0a8ea8ddbf596c4e56b2355
+  $wunsafeDrop :: GHC.Prim.Int# -> [a1] -> [a1]
+  {- Arity: 2, HasNoCafRefs, Strictness: <L,1*U><S,1*U>,
+     Inline: [0] -}
+d7e0f8fb15bd91780e767bce1556ee58
+  $wunsafeDrop1 :: GHC.Prim.Int# -> [a1] -> [a1]
+  {- Arity: 2, HasNoCafRefs, Strictness: <L,1*U><S,1*U>,
+     Inline: [0] -}
+f69e6333e67a55c71834c62215ffa8e1
+  cuts :: GHC.Classes.Eq a => a -> [a] -> [[a]]
+  {- Arity: 3, HasNoCafRefs,
+     Strictness: <L,U(A,C(C1(U)))><L,U><S,1*U>,
+     Unfolding: (\ @ a $dEq :: GHC.Classes.Eq a c :: a eta :: [a] ->
+                 let {
+                   lvl4 :: a -> GHC.Types.Bool
+                     {- Arity: 1, Strictness: <L,U>,
+                        Unfolding: InlineRule (1, True, False)
+                                   (\ ds :: a -> GHC.Classes./= @ a $dEq ds c) -}
+                   = \ ds :: a -> GHC.Classes./= @ a $dEq ds c
+                 } in
+                 letrec {
+                   go1 :: [a] -> [[a]] {- Arity: 1, Strictness: <S,1*U> -}
+                   = \ b2 :: [a] ->
+                     case b2 of wild {
+                       [] -> GHC.Types.[] @ [a]
+                       : ipv ipv1
+                       -> let {
+                            ds :: ([a], [a])
+                            = case GHC.List.$wspan @ a lvl4 wild of ww { (#,#) ww1 ww2 ->
+                              (ww1, ww2) }
+                          } in
+                          GHC.Types.:
+                            @ [a]
+                            (case ds of wild1 { (,) token rest -> token })
+                            (case ds of wild1 { (,) token rest ->
+                             go1 (Graphics.WaveFront.Utilities.$wunsafeDrop @ a 1 rest) }) }
+                 } in
+                 go1 eta) -}
+e79f9b04fa2a8a18d8ad15e99e6c24f0
+  dropComment :: GHC.Base.String -> GHC.Base.String
+  {- Arity: 1, HasNoCafRefs,
+     Unfolding: (GHC.List.takeWhile
+                   @ GHC.Types.Char
+                   Graphics.WaveFront.Utilities.dropComment1) -}
+ac1311eda307aaeab06ff2a9d2066488
+  dropComment1 :: GHC.Types.Char -> GHC.Types.Bool
+  {- Arity: 1, HasNoCafRefs, Strictness: <S(S),1*U(1*U)>,
+     Unfolding: InlineRule (1, True, False)
+                (\ ds :: GHC.Types.Char ->
+                 case ds of wild { GHC.Types.C# c1 ->
+                 case c1 of wild1 {
+                   DEFAULT -> GHC.Types.True '#' -> GHC.Types.False } }) -}
+c1ee6453df233fa5e950f05196220f84
+  enumerate ::
+    [GHC.Types.Int -> (GHC.Types.Int, token, comment)]
+    -> [(GHC.Types.Int, token, comment)]
+  {- Arity: 1,
+     Unfolding: (\ @ token @ comment ->
+                 GHC.List.zipWith
+                   @ GHC.Types.Int
+                   @ (GHC.Types.Int -> (GHC.Types.Int, token, comment))
+                   @ (GHC.Types.Int, token, comment)
+                   (Graphics.WaveFront.Utilities.enumerate2 @ token @ comment)
+                   Graphics.WaveFront.Utilities.enumerate1) -}
+b02c1b7f3ff19d7595ae3884cb7e2a20
+  enumerate1 :: [GHC.Types.Int]
+  {- Unfolding: (GHC.Enum.eftInt 1 2147483647) -}
+57fdce56a35f7356c128c61dff3445cf
+  enumerate2 ::
+    GHC.Types.Int
+    -> (GHC.Types.Int -> (GHC.Types.Int, token, comment))
+    -> (GHC.Types.Int, token, comment)
+  {- Arity: 2, HasNoCafRefs, Strictness: <L,U><C(S),1*C1(U(U,U,U))>,
+     Unfolding: InlineRule (2, True, True)
+                (\ @ token
+                   @ comment
+                   x :: GHC.Types.Int
+                   y :: GHC.Types.Int -> (GHC.Types.Int, token, comment) ->
+                 y x) -}
+6357daf11f3e72490c06bdf7102f7029
+  isComment :: GHC.Base.String -> GHC.Types.Bool
+  {- Arity: 1, Strictness: <L,1*U>,
+     Unfolding: InlineRule (1, True, False)
+                (\ x :: GHC.Base.String ->
+                 Data.OldList.isPrefixOf
+                   @ GHC.Types.Char
+                   GHC.Classes.$fEqChar
+                   Graphics.WaveFront.Utilities.isComment1
+                   (GHC.List.dropWhile @ GHC.Types.Char GHC.Unicode.isSpace x)) -}
+da44ebdd9779ab47f12300bacfad1a6a
+  isComment1 :: [GHC.Types.Char]
+  {- Unfolding: (GHC.CString.unpackCString# "#"#) -}
+0ef063d26127b151023d68cb1a013b7b
+  pairwise :: (a -> a -> b) -> [a] -> [b]
+  {- Arity: 2, HasNoCafRefs, Strictness: <L,C(C1(U))><S,U>,
+     Unfolding: (\ @ a @ b f :: a -> a -> b xs :: [a] ->
+                 GHC.List.zipWith
+                   @ a
+                   @ a
+                   @ b
+                   f
+                   xs
+                   (Graphics.WaveFront.Utilities.$wunsafeDrop1 @ a 1 xs)) -}
+4aad729e0b3843797daa05fcd23872b6
+  parseTokenWith ::
+    GHC.Base.String
+    -> (GHC.Base.String -> Data.Either.Either e token)
+    -> GHC.Types.Int
+    -> (GHC.Types.Int, Data.Either.Either e token, GHC.Base.String)
+  {- Arity: 3, Strictness: <L,U><L,C(U)>,
+     Unfolding: InlineRule (2, True, True)
+                (\ @ e
+                   @ token
+                   line :: GHC.Base.String
+                   parse :: GHC.Base.String -> Data.Either.Either e token
+                   eta :: GHC.Types.Int ->
+                 Graphics.WaveFront.Utilities.withoutComment
+                   @ (Data.Either.Either e token)
+                   line
+                   parse
+                   eta) -}
+95fc0d40d33a6ecf9b3d50e52e107533
+  rows :: GHC.Base.String -> [GHC.Base.String]
+  {- Arity: 1, Strictness: <S,1*U>,
+     Unfolding: InlineRule (1, True, False)
+                (\ x :: GHC.Base.String ->
+                 GHC.Base.build
+                   @ [GHC.Types.Char]
+                   (\ @ b c :: [GHC.Types.Char] -> b -> b[OneShot] n :: b[OneShot] ->
+                    GHC.Base.foldr
+                      @ [GHC.Types.Char]
+                      @ b
+                      (GHC.List.filterFB
+                         @ [GHC.Types.Char]
+                         @ b
+                         c
+                         Graphics.WaveFront.Utilities.rows1)
+                      n
+                      (Data.OldList.lines x))) -}
+b9a5a2f263b094cb93c40a2653876035
+  rows1 :: GHC.Base.String -> GHC.Types.Bool
+  {- Arity: 1, Strictness: <L,U>,
+     Unfolding: (\ x :: GHC.Base.String ->
+                 letrec {
+                   go1 :: [GHC.Base.String -> GHC.Types.Bool] -> Data.Monoid.Any
+                     {- Arity: 1, Strictness: <S,1*U> -}
+                   = \ ds :: [GHC.Base.String -> GHC.Types.Bool] ->
+                     case ds of wild {
+                       [] -> GHC.Types.False `cast` (Sym (Data.Monoid.NTCo:Any[0]))
+                       : y ys
+                       -> case y x of wild1 {
+                            GHC.Types.False -> go1 ys
+                            GHC.Types.True
+                            -> GHC.Types.True `cast` (Sym (Data.Monoid.NTCo:Any[0])) } }
+                 } in
+                 case (go1 Graphics.WaveFront.Utilities.rows2)
+                        `cast`
+                      (Data.Monoid.NTCo:Any[0]) of wild {
+                   GHC.Types.False -> GHC.Types.True
+                   GHC.Types.True -> GHC.Types.False }) -}
+837f35158b6124c7e86723f4e1fc1872
+  rows2 :: [GHC.Base.String -> GHC.Types.Bool]
+  {- Strictness: m2,
+     Unfolding: (GHC.Types.:
+                   @ (GHC.Base.String -> GHC.Types.Bool)
+                   (GHC.List.null @ GHC.Types.Char)
+                   Graphics.WaveFront.Utilities.rows3) -}
+dd22e16b2f71f65762e56f0ff709373c
+  rows3 :: [GHC.Base.String -> GHC.Types.Bool]
+  {- Strictness: m2,
+     Unfolding: (GHC.Types.:
+                   @ (GHC.Base.String -> GHC.Types.Bool)
+                   Graphics.WaveFront.Utilities.isComment
+                   (GHC.Types.[] @ (GHC.Base.String -> GHC.Types.Bool))) -}
+29602b485082592399ebe9c0adde6230
+  second :: (a, b, c) -> b
+  {- Arity: 1, HasNoCafRefs, Strictness: <S(LSL),1*U(A,1*U,A)>,
+     Unfolding: InlineRule (1, True, False)
+                (\ @ a @ b @ c ds :: (a, b, c) ->
+                 case ds of wild { (,,) ds1 b1 ds2 -> b1 }) -}
+f03988351fb630e534c541f6598156a7
+  splitWith ::
+    GHC.Classes.Eq a => ([a] -> ([a], [a])) -> [a] -> [[a]]
+  {- Arity: 3, HasNoCafRefs, Strictness: <L,A><L,C(U(U,1*U))><S,1*U>,
+     Inline: INLINE[0],
+     Unfolding: InlineRule (3, True, True)
+                (\ @ a w :: GHC.Classes.Eq a w1 :: [a] -> ([a], [a]) w2 :: [a] ->
+                 Graphics.WaveFront.Utilities.$wsplitWith @ a w1 w2) -}
+020e428330b2ac8c5036f38f5f82b144
+  takeComment :: GHC.Base.String -> GHC.Base.String
+  {- Arity: 1, HasNoCafRefs,
+     Unfolding: (GHC.List.dropWhile
+                   @ GHC.Types.Char
+                   Graphics.WaveFront.Utilities.dropComment1) -}
+23f9d6adf04ced0006e748fbc9a41d10
+  third :: (a, b, c) -> c
+  {- Arity: 1, HasNoCafRefs, Strictness: <S(LLS),1*U(A,A,1*U)>,
+     Unfolding: InlineRule (1, True, False)
+                (\ @ a @ b @ c ds :: (a, b, c) ->
+                 case ds of wild { (,,) ds1 ds2 c1 -> c1 }) -}
+876b7e9e67d641fbd5162815fcd77d19
+  vector ::
+    GHC.Read.Read r =>
+    ([r] -> b) -> [GHC.Base.String] -> e -> Data.Either.Either e b
+  {- Arity: 4,
+     Strictness: <L,U(A,A,C(C1(U)),A)><L,1*C1(U)><S,1*U><L,U>,
+     Unfolding: (\ @ r
+                   @ b
+                   @ e
+                   $dRead :: GHC.Read.Read r
+                   f :: [r] -> b
+                   coords :: [GHC.Base.String]
+                   e1 :: e ->
+                 case Graphics.WaveFront.Utilities.vector1
+                        @ r
+                        (GHC.Base.map
+                           @ [GHC.Types.Char]
+                           @ (Data.Either.Either GHC.Base.String r)
+                           (Text.Read.readEither @ r $dRead)
+                           coords) of wild {
+                   Data.Either.Left l -> Data.Either.Left @ e @ b e1
+                   Data.Either.Right r1 -> Data.Either.Right @ e @ b (f r1) }) -}
+d35e22c8c5472a15026ef04c7d5240c9
+  vector1 ::
+    [Data.Either.Either GHC.Base.String r]
+    -> Data.Either.Either GHC.Base.String [r]
+  {- Arity: 1, HasNoCafRefs, Strictness: <S,1*U> -}
+a482813211adb2162cf41461d93397f4
+  withoutComment ::
+    GHC.Base.String
+    -> (GHC.Base.String -> a)
+    -> GHC.Types.Int
+    -> (GHC.Types.Int, a, GHC.Base.String)
+  {- Arity: 3, Strictness: <S,1*U><L,1*C1(U)><L,U>m,
+     Inline: INLINE[0],
+     Unfolding: InlineRule (3, True, False)
+                (\ @ a
+                   w :: GHC.Base.String
+                   w1 :: GHC.Base.String -> a
+                   w2 :: GHC.Types.Int ->
+                 case w of wild {
+                   []
+                   -> case Graphics.WaveFront.Utilities.withoutComment2
+                      ret_ty (GHC.Types.Int, a, GHC.Base.String)
+                      of {}
+                   : l ine
+                   -> let {
+                        ds :: (GHC.Types.Char, [GHC.Types.Char], [GHC.Types.Char])
+                        = case GHC.List.$wspan
+                                 @ GHC.Types.Char
+                                 Graphics.WaveFront.Utilities.dropComment1
+                                 ine of ww { (#,#) ww1 ww2 ->
+                          case ww1 of wild1 {
+                            [] -> Graphics.WaveFront.Utilities.withoutComment1
+                            : l1 tokens -> (l1, tokens, ww2) } }
+                      } in
+                      (w2,
+                       w1 (case ds of ds1 { (,,) l1 tokens comment -> tokens }),
+                       case ds of ds1 { (,,) l1 tokens comment -> comment }) }) -}
+6a20f16726636e20094b88046e4aadb2
+  withoutComment1 ::
+    (GHC.Types.Char, [GHC.Types.Char], [GHC.Types.Char])
+  {- Strictness: b -}
+9ee747a58793c9125e82b462d462940a
+  withoutComment2 :: (GHC.Types.Int, a, GHC.Base.String)
+  {- Strictness: b -}
+vectorised variables:
+vectorised tycons:
+vectorised reused tycons:
+parallel variables:
+parallel tycons:
+trusted: safe
+require own pkg trusted: False
+

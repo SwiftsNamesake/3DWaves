@@ -18,3 +18,7 @@ Jonatan H Sundqvist
 
 ##TODO
 There is currently no standalone list of tasks (cf. source files).
+- Use Parsec instead (branch off) (?)
+- Add sample models and demos
+- Add profiling and checks
+- GHCi support
