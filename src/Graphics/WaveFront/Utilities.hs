@@ -37,7 +37,9 @@ import Text.Read (readEither)
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- Functions
 --------------------------------------------------------------------------------------------------------------------------------------------
+
 -- Parsing utilities -----------------------------------------------------------------------------------------------------------------------
+
 -- | This strikes me as overly convoluted. Should probably be refactored or removed entirely.
 parseTokenWith :: String -> (String -> Either e token) -> Int -> (Int, Either e token, String)
 parseTokenWith line parse = withoutComment line parse
@@ -78,7 +80,7 @@ enumerate = zipWith (flip ($)) [1..]
 -- TODO: Higher order function for composing predicates
 rows :: String -> [String]
 rows = filter (not . satisfiesAny [null, isComment]) . lines
-  where satisfiesAny predicates x = any ($ x) predicates
+  where satisfiesAny ps x = any ($ x) ps
 
 
 -- |

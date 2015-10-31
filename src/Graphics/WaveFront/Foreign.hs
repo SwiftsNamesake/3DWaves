@@ -36,41 +36,15 @@ import System.IO.Unsafe (unsafePerformIO)
 import Foreign.Storable
 import qualified Foreign.C as C
 
+import           Graphics.WaveFront.Types
 import qualified Graphics.WaveFront.Parsers as Parsers
-
-
-
---------------------------------------------------------------------------------------------------------------------------------------------
--- Types
---------------------------------------------------------------------------------------------------------------------------------------------
--- |
-newtype COBJ = COBJ Parsers.OBJ
-
-
--- |
-newtype CMTL = CMTL Parsers.MTL
-
-
--- | We
-instance Storable COBJ where
-  sizeOf    = const 0
-  alignment = const 0
-  peek _    = error "Work in progress"
-  poke _    = error "Work in progress"
-
-
--- | We
-instance Storable CMTL where
-  sizeOf    = const 0
-  alignment = const 0
-  peek _    = error "Work in progress"
-  poke _    = error "Work in progress"
 
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- Functions
 --------------------------------------------------------------------------------------------------------------------------------------------
+
 -- |
 -- I feel dirty...
 parseOBJ :: C.CString -> COBJ

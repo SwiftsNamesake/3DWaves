@@ -85,6 +85,7 @@ import Southpaw.Interactive.Console (untilM, clamped, perhaps) -- TODO: These fu
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- Types
 --------------------------------------------------------------------------------------------------------------------------------------------
+
 -- |
 type Buffers = [(Normal3 GLfloat, WF.Material, [Vertex3 GLfloat])]
 data AppState = AppState { _rotation :: (Double, Double), _mouse :: Maybe (Double, Double), _clientsize :: (Int, Int), _frame :: Int } deriving (Show)
@@ -94,6 +95,7 @@ data AppState = AppState { _rotation :: (Double, Double), _mouse :: Maybe (Doubl
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- Functions
 --------------------------------------------------------------------------------------------------------------------------------------------
+
 -- |
 initOpenGL :: IO ()
 initOpenGL = do
@@ -256,31 +258,7 @@ createTexturedMesh theprogram (vs, ts) model centre = do
 	printf "Sampler location: %s\n" (show locs)
 
 	-- TODO: Initialise properly
-	return Mesh.Mesh { Mesh.attributes=Map.fromList [("aVertexPosition", (locv, vertexbuffer,   3)),
-	                                                 ("aTexCoord",       (loct, texcoordbuffer, 2))],
-
-	                   Mesh.primitive = Triangles,
-	                   Mesh.texture   = mtexture,   -- TOOD: This could fail
-	                   Mesh.shader    = theprogram,
-	                   Mesh.uniforms  = uniforms,
-	                   Mesh.prepare   = Just prepare,
-	                   Mesh.centre    = centre,
-	                   Mesh.bounds    = WF.boundingbox model,
-	                   Mesh.size      = (length $ vs) `div` 3 }
-	where
-	  prepare mesh = do
-	    --
-	    GL.currentProgram $= Just (Mesh.shader mesh)
-
-	    -- Texturing
-	    -- GL.texture GL.Texture2D $= GL.Enabled -- TODO: Move this (?)
-	    GL.activeTexture $= (GL.TextureUnit 0)                --
-	    -- print (Mesh.texture mesh)
-	    GL.textureBinding GL.Texture2D $= (Mesh.texture mesh) -- Is this needed (?)
-	    -- texture2DWrap $= (Repeated, ClampToEdge)
-	    textureFilter   Texture2D   $= ((Linear', Nothing), Linear')
-	    textureWrapMode Texture2D S $= (Mirrored, ClampToEdge)
-	    textureWrapMode Texture2D T $= (Mirrored, ClampToEdge)
+c
 
 
 

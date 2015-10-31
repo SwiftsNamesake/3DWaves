@@ -38,7 +38,8 @@ import System.IO       (hFlush, stdout)
 
 import Data.Either (rights, isLeft)
 
-import Graphics.WaveFront.Parsers   (parseOBJ, parseMTL, createMTLTable, createModel, OBJ(), MTL(), MTLTable(), OBJToken(LibMTL), Model())
+import Graphics.WaveFront.Types
+import Graphics.WaveFront.Parsers   (parseOBJ, parseMTL, createMTLTable, createModel)
 import Graphics.WaveFront.Utilities
 
 
