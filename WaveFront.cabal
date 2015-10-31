@@ -10,7 +10,7 @@ name:                WaveFront
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.1.0.1
+version:             0.1.0.2
 
 -- A short (one-line) description of the package.
 synopsis:            Parsers and utilities for the OBJ WaveFront 3D model format
@@ -48,7 +48,8 @@ cabal-version:       >=1.10
 
 library
   -- Modules exported by the library.
-  exposed-modules:     Graphics.WaveFront.Utilities, Graphics.WaveFront.Parsers, Graphics.WaveFront.Load, Graphics.WaveFront.Foreign
+  exposed-modules:     Graphics.WaveFront.Types, Graphics.WaveFront.Utilities, Graphics.WaveFront.Parsers, Graphics.WaveFront.Load,
+                       Graphics.WaveFront.Foreign
 
   -- Modules included in this library but not exported.
   -- other-modules:
