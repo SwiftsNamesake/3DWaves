@@ -10,3 +10,6 @@ resolver: lts-3.5
 flags: {}
 packages:
 - '.'
+- location:
+    git: https://github.com/SwiftsNamesake/Cartesian.git
+    commit: ea7bd588b33366be96d1699034c0d4a1e3186c76
