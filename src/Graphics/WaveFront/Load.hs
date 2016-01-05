@@ -38,6 +38,8 @@ import System.IO       (hFlush, stdout)
 
 import Data.Either (rights, isLeft)
 
+import Control.Lens ((^.), _2)
+
 import Graphics.WaveFront.Types
 import Graphics.WaveFront.Parsers   (parseOBJ, parseMTL, createMTLTable, createModel)
 import Graphics.WaveFront.Utilities
@@ -77,13 +79,13 @@ loadMaterials :: [String] -> IO MTLTable
 loadMaterials fns = do
   mtls <- mapM loadMTL fns --
   return . createMTLTable . zip (map (snd . splitFileName) fns) . map tokensOf $ mtls --
-  where tokensOf = rights . map second
+  where tokensOf = rights . map (^._2)
 
 
 -- | Loads an OBJ model from file, including associated materials
 loadModel :: String -> IO Model
 loadModel fn = do
   obj       <- loadOBJ fn
-  materials <- loadMaterials [ (fst $ splitFileName fn) </> name | LibMTL name <- rights $ map second obj ]
+  materials <- loadMaterials [ (fst $ splitFileName fn) </> name | LibMTL name <- rights $ map (^._2) obj ]
   return $ createModel obj materials
   -- where loadWithName name = loadMTL name >>= return . (name,)

@@ -80,7 +80,9 @@ enumerate = zipWith (flip ($)) [1..]
 -- TODO: Higher order function for composing predicates
 rows :: String -> [String]
 rows = filter (not . satisfiesAny [null, isComment]) . lines
-  where satisfiesAny ps x = flip any . (flip ($)) ($ x) ps
+  where
+    satisfiesAny :: [a -> Bool] -> a -> Bool
+    satisfiesAny ps x = any ($ x) ps
 
 
 -- |

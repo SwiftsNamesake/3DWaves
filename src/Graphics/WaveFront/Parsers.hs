@@ -70,7 +70,7 @@ module Graphics.WaveFront.Parsers (parseOBJ, parseMTL,
                                    modelAttributes, tessellate, boundingbox,
                                    hasTextures, textures,
                                    module Graphics.WaveFront.Types,
-                                   Boundingbox(..), Vector(..),
+                                   BoundingBox(..), Vector(..),
                                    createModel, createMTLTable) where
 
 
@@ -87,11 +87,11 @@ import qualified Data.Set as Set
 
 import Text.Read     (readMaybe, readEither)
 import Control.Monad (liftM)
-import Control.Lens
+import Control.Lens hiding (indices)
 
 -- import Southpaw.Utilities.Utilities (pairwise, cuts)
 
-import Cartesian.Space.Types (BoundingBox(..), Vector(..))
+import Cartesian.Space.Types (BoundingBox(..), Vector3D(..))
 
 import Graphics.WaveFront.Types
 import Graphics.WaveFront.Utilities
@@ -237,7 +237,7 @@ buildIndexMapWith tokens = Map.fromList . pairwise zipIndices . reverse . addLas
 -- TODO: Default material, take 'error-handling' function (?)
 --
 facesOf :: [OBJToken] -> MTLTable -> [Either String Face]
-facesOf tokens table = reverse . third . foldl update ("", "", []) $ tokens
+facesOf tokens table = reverse . (^._3) . foldl update ("", "", []) $ tokens
   where retrieve lib mat       = Map.lookup lib table >>= Map.lookup mat
         createFace lib mat ind = case retrieve lib mat of
                                    Nothing -> Left  $ "No such material: " ++ lib ++ "." ++ mat
@@ -299,7 +299,7 @@ createMTLTable mtls = Map.fromList . map (\ (name, tokens) -> (name, Map.mapMayb
 -- I never knew pattern matching in list comprehensions could be used to filter by constructor
 -- let rows = parseOBJ data in ([ v | @v(Vertex {}) <- rows], [ v | @v(Vertex {}) <- rows])
 createModel :: OBJ -> MTLTable -> Model
-createModel tokens thematerials = let modeldata  = rights $ map second tokens -- TODO: Vat do vee du viz ze dissidents, kommandant?
+createModel tokens thematerials = let modeldata  = rights $ map (^._2) tokens -- TODO: Vat do vee du viz ze dissidents, kommandant?
                                   in Model { vertices  = [ (x, y, z) | OBJVertex  x y z <- modeldata ],
                                              normals   = [ (x, y, z) | OBJNormal  x y z <- modeldata ],
                                              texcoords = [ (x, y)    | OBJTexture x y   <- modeldata ],
@@ -336,10 +336,13 @@ tessellate face@(Face { indices=ind }) = face { indices=triangles ind }
 
 -- |
 -- TODO: Deal with empty vertex lists (?)
-boundingbox :: Model -> BoundingBox Float
-boundingbox model = BoundingBox { _centre=Vector (minx+maxx) (miny+maxy) (minz+maxz) * 0.5, _size=Vector (maxx-minx) (maxy-miny) (maxz-minz) }
+-- boundingbox :: (RealFloat n, Ord n) => Model -> BoundingBox (Vector3D n)
+boundingbox :: Model -> BoundingBox (Vector3D Float)
+boundingbox model = BoundingBox { centreOf=Vector3D (minx+maxx) (miny+maxy) (minz+maxz) * Vector3D 0.5 0 0, sizeOf=Vector3D (maxx-minx) (maxy-miny) (maxz-minz) }
   where
+    minmax :: (Ord o) => [o] -> (o, o)
     minmax (v:alues) = foldr (\val acc -> (min val (fst acc), max val (snd acc))) (v, v) alues              -- TODO: Factor out
+
     [(minx, maxx), (miny, maxy), (minz, maxz)] = [ minmax . map (^.f) $ vertices model | f <- [_1, _2, _3]] -- TODO: Make sure the order is right
 
 -- Model queries ---------------------------------------------------------------------------------------------------------------------------
