@@ -10,7 +10,7 @@ name:                WaveFront
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.1.0.2
+version:             0.1.1.0
 
 -- A short (one-line) description of the package.
 synopsis:            Parsers and utilities for the OBJ WaveFront 3D model format
@@ -58,13 +58,14 @@ library
   other-extensions:    UnicodeSyntax, TupleSections, ForeignFunctionInterface
 
   -- Other library packages from which modules are imported.
-  build-depends:       base <= 4.8.1.0,
+  build-depends:       base == 4.*,
                        lens <= 4.13.0.0,
                        OpenGL,
                        GLUtil,
                        linear,
                        filepath,
-                       containers
+                       containers,
+                       Cartesian
 
   -- Directories containing source files.
   hs-source-dirs:      src

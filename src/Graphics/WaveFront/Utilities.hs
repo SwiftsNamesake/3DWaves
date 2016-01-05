@@ -80,7 +80,7 @@ enumerate = zipWith (flip ($)) [1..]
 -- TODO: Higher order function for composing predicates
 rows :: String -> [String]
 rows = filter (not . satisfiesAny [null, isComment]) . lines
-  where satisfiesAny ps x = any ($ x) ps
+  where satisfiesAny ps x = flip any . (flip ($)) ($ x) ps
 
 
 -- |
@@ -91,16 +91,7 @@ rows = filter (not . satisfiesAny [null, isComment]) . lines
 -- TODO: Generic function for mapping and sequencing readEither (cf. "vt" case in parseOBJRow) (?)
 vector :: Read r => ([r] -> b) -> [String] -> e -> Either e b
 vector f coords e = either (Left . const e) (Right) (sequence (map readEither coords) >>= Right . f)
--- vector _ _      = Left  $ "Wrong number of coordinates for vector"
-
-
--- |
-second :: (a, b, c) -> b
-second (_, b, _) = b
-
--- |
-third :: (a, b, c) -> c
-third (_, _, c) = c
+-- vector _ _        = Left $ "Wrong number of coordinates for vector"
 
 -- From Southpaw ---------------------------------------------------------------------------------------------------------------------------
 

@@ -179,11 +179,6 @@ data Model = Model { vertices  :: [Vector Float],
                      objects   :: Map.Map [String] (Int, Int)  -- TODO: Type synonym
                    } deriving (Show)
 
-
--- |
--- TODO: Use BoundingBox from Cartesian instead
-data BoundingBox n = BoundingBox { left :: n, right :: n, top :: n, bottom :: n, front :: n, back :: n }
-
 -- Foreign ---------------------------------------------------------------------------------------------------------------------------------
 
 -- |

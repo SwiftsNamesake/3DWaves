@@ -1,13 +1,14 @@
 -- |
 -- Module      : Graphics.WaveFront.Parsers
--- Description : descr
+-- Description :
 -- Copyright   : (c) Jonatan H Sundqvist, February 8 2015
 -- License     : MIT
 -- Maintainer  : Jonatan H Sundqvist
 -- Stability   : experimental|stable
 -- Portability : POSIX (not sure)
 --
--- Created February 8 2015-- Wavefront - Parsers.hs
+-- Created February 8 2015
+-- Wavefront - Parsers.hs
 -- Migrated to separate project on February 21 2015
 
 -- TODO | - Appropriate container types (eg. bytestring, vector)
@@ -27,6 +28,8 @@
 --        - Caching (?)
 --        - Performance, profiling, optimisations
 --          -- Strict or lazy (eg. with Data.Map) (?)
+--          -- Multi-threading
+--          -- Appropriate container types
 --
 --        - PrintfArg instances for the types defined in this module
 --        - Reconciling Cabal and hierarchical modules
@@ -66,7 +69,8 @@ module Graphics.WaveFront.Parsers (parseOBJ, parseMTL,
                                    facesOf,  materialsOf,
                                    modelAttributes, tessellate, boundingbox,
                                    hasTextures, textures,
-                                   MTL(), OBJ(), Model(..), Face(..), Material(..), OBJToken(..), MTLToken(..), MTLTable(..), BoundingBox(..), OBJNoParse(..), MTLNoParse(..),
+                                   module Graphics.WaveFront.Types,
+                                   Boundingbox(..), Vector(..),
                                    createModel, createMTLTable) where
 
 
@@ -74,17 +78,20 @@ module Graphics.WaveFront.Parsers (parseOBJ, parseMTL,
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
-import Data.List   (groupBy, unzip4)
-import Data.Maybe  (listToMaybe, catMaybes)
-import Data.Either (rights)
-import Data.Char   (isSpace)
+import           Data.List   (groupBy, unzip4)
+import           Data.Maybe  (listToMaybe, catMaybes)
+import           Data.Either (rights)
+import           Data.Char   (isSpace)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Text.Read     (readMaybe, readEither)
 import Control.Monad (liftM)
+import Control.Lens
 
 -- import Southpaw.Utilities.Utilities (pairwise, cuts)
+
+import Cartesian.Space.Types (BoundingBox(..), Vector(..))
 
 import Graphics.WaveFront.Types
 import Graphics.WaveFront.Utilities
@@ -130,9 +137,9 @@ parseOBJ = enumerate . map parseOBJRow . lines -- . rows
 parseOBJRow :: String -> (Int -> OBJRow) -- Maybe OBJToken
 parseOBJRow ln = parseTokenWith ln $ \ line -> let (attr:values) = words line in case (attr:values) of
     ("f":_:_:_:_)      -> either (Left . noparse . const line) (Right . OBJFace) . sequence . map (ivertex . cuts '/') $ values -- Face
-    ["v",  sx, sy, sz] -> vector (\ [x, y, z] -> OBJVertex  x y z) [sx, sy, sz] (noparse line) -- Vertex
-    ["vn", sx, sy, sz] -> vector (\ [x, y, z] -> OBJNormal  x y z) [sx, sy, sz] (noparse line) -- Normal
-    ["vt", sx, sy]     -> vector (\ [x, y]    -> OBJTexture x y)   [sx, sy]     (noparse line) -- Texture
+    ["v",  sx, sy, sz] -> vector (\ [x, y, z] -> OBJVertex  x y z) [sx, sy, sz] (noparse line)                                  -- Vertex
+    ["vn", sx, sy, sz] -> vector (\ [x, y, z] -> OBJNormal  x y z) [sx, sy, sz] (noparse line)                                  -- Normal
+    ["vt", sx, sy]     -> vector (\ [x, y]    -> OBJTexture x y)   [sx, sy]     (noparse line)                                  -- Texture
     ("g":_:_)          -> Right $ Group  values                                 -- Group
     ("o":_:_)          -> Right $ Object values                                 -- Object
     ("s":_:_)          -> Left  $ noparse line                                  -- Smooth shading
@@ -320,7 +327,7 @@ modelAttributes model = unzip4 $ concat [ map (attributesAt mat) theindices | Fa
 -- TODO: Better names (?)
 tessellate :: Face -> Face
 tessellate face@(Face { indices=ind }) = face { indices=triangles ind }
-  where triangles (a:rest) =concat $ pairwise (\b c -> [a, b, c]) rest
+  where triangles (a:rest) = concat $ pairwise (\b c -> [a, b, c]) rest
 
 
 -- |
@@ -328,13 +335,12 @@ tessellate face@(Face { indices=ind }) = face { indices=triangles ind }
 
 
 -- |
+-- TODO: Deal with empty vertex lists (?)
 boundingbox :: Model -> BoundingBox Float
-boundingbox model = BoundingBox { left=minx, right=maxx, bottom=miny, top=maxy, front=maxz, back=minz }
+boundingbox model = BoundingBox { _centre=Vector (minx+maxx) (miny+maxy) (minz+maxz) * 0.5, _size=Vector (maxx-minx) (maxy-miny) (maxz-minz) }
   where
-    minmax (v:alues) = foldr (\val acc -> (min val (fst acc), max val (snd acc))) (v, v) alues
-    (minx, maxx) = minmax . map (\(x, _, _) -> x) $ vertices model
-    (miny, maxy) = minmax . map (\(_, y, _) -> y) $ vertices model
-    (minz, maxz) = minmax . map (\(_, _, z) -> z) $ vertices model -- TODO: Make sure the order is right
+    minmax (v:alues) = foldr (\val acc -> (min val (fst acc), max val (snd acc))) (v, v) alues              -- TODO: Factor out
+    [(minx, maxx), (miny, maxy), (minz, maxz)] = [ minmax . map (^.f) $ vertices model | f <- [_1, _2, _3]] -- TODO: Make sure the order is right
 
 -- Model queries ---------------------------------------------------------------------------------------------------------------------------
 
