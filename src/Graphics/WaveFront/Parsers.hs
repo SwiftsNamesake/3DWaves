@@ -85,6 +85,10 @@ import           Data.Char   (isSpace)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import qualified Text.Parsec as Parsec
+import           Text.Parsec                          ((<?>), (<|>), ParsecT, Stream, char)
+import           Text.ParserCombinators.Parsec.Number (floating3)
+
 import Text.Read     (readMaybe, readEither)
 import Control.Monad (liftM)
 import Control.Lens hiding (indices)

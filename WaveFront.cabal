@@ -63,6 +63,7 @@ library
                        OpenGL,
                        GLUtil,
                        linear,
+                       parsec,
                        filepath,
                        containers,
                        Cartesian
