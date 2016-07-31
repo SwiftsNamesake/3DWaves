@@ -86,8 +86,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import qualified Text.Parsec as Parsec
-import           Text.Parsec                          ((<?>), (<|>), ParsecT, Stream, char)
-import           Text.ParserCombinators.Parsec.Number (floating3)
+import           Text.Parsec                   ((<?>), (<|>), ParsecT, Stream, char)
+import           Text.ParserCombinators.Parsec (floating3)
 
 import Text.Read     (readMaybe, readEither)
 import Control.Monad (liftM)
@@ -116,7 +116,8 @@ import Graphics.WaveFront.Utilities
 -- TODO: Function for composing predicates (?)
 -- TODO: Should this function separate the various fields (eg. [(Vertices, Faces, Materials, Groups)] instead of [Maybe OBJToken])
 --
-parseOBJ :: String -> OBJ
+-- format :: (Stream s' Identity Char) => ParsecT s' u Identity (FormatToken)
+parseOBJ :: (Stream s' Identity Char) => ParsecT s' u Identity (OBJ m)
 parseOBJ = enumerate . map parseOBJRow . lines -- . rows
 
 
@@ -146,7 +147,7 @@ parseOBJRow ln = parseTokenWith ln $ \ line -> let (attr:values) = words line in
     ["vt", sx, sy]     -> vector (\ [x, y]    -> OBJTexture x y)   [sx, sy]     (noparse line)                                  -- Texture
     ("g":_:_)          -> Right $ Group  values                                 -- Group
     ("o":_:_)          -> Right $ Object values                                 -- Object
-    ("s":_:_)          -> Left  $ noparse line                                  -- Smooth shading
+    ("s":_:_)          -> Left  $ noparse line                                  -- Smooth shading (TODO: Don't ignore)
     ["mtllib", lib]    -> Right $ LibMTL lib                                    --
     ["usemtl", mtl]    -> Right $ UseMTL mtl                                    --
     _                  -> Left  $ noparse line                                  -- TODO: More informative errors

@@ -36,6 +36,7 @@ module Graphics.WaveFront.Types where
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
 import qualified Data.Map as Map
+import Cartesian.Space.Types (Vertex3D(..))
 import Foreign.Storable
 
 
@@ -51,36 +52,36 @@ import Foreign.Storable
 -- TODO: Add context, metadata (eg. line numbers, filename) (?)
 -- TODO: Naming scheme (added OBJ prefix to prevent name clashes; cf. Face type)
 -- TODO: Comment token (preserve comments in parser output or remove them) (?)
-data OBJToken = OBJVertex  Float Float Float          |
-                OBJNormal  Float Float Float          |
-                OBJTexture Float Float                |
-                OBJFace [(Int, Maybe Int, Maybe Int)] | -- TODO: Associate material with each face, handle absent indices
+data OBJToken m f s i = OBJVertex  f f f |
+                        OBJNormal  f f f |
+                        OBJTexture f f   |
+                        OBJFace (m (i, Maybe i, Maybe i)) | -- TODO: Associate material with each face, handle absent indices
 
-                UseMTL String | --
-                LibMTL String | -- TODO: Use actual MTL type
+                        UseMTL s | --
+                        LibMTL s | -- TODO: Use actual MTL type
 
-                Group  [String] |   -- TODO: Do grouped faces have to be consecutive?
-                Object [String]     -- TODO: What is the difference between group and object?
-                deriving (Eq, Show) -- TODO: Derive Read (?)
+                        Group  (m s) |   -- TODO: Do grouped faces have to be consecutive?
+                        Object (m s)     -- TODO: What is the difference between group and object?
+                        deriving (Eq, Show) -- TODO: Derive Read (?)
 
 
 -- |
 -- TODO: Rename (?)
-data OBJNoParse = OBJComment String | OBJEmpty | OBJNoSuchAttribute String | OBJNoParse String deriving (Show)
+data OBJNoParse s = OBJComment s | OBJEmpty | OBJNoSuchAttribute s | OBJNoParse s deriving (Show)
 
 
 -- |
 -- TODO: Use error type instead of String, allowing us to distinguish invalid data
 --       from eg. comments and blank lines (?)
-type OBJRow = (Int, Either OBJNoParse OBJToken, String)
+type OBJRow m f s i = (i, Either (OBJNoParse s) (OBJToken m f s i), s)
 
 
--- | Output type of the OBJ parser. Currently a list of line number and token (or error string) pairs
+-- | Output type of the OBJ parser. Currently a list-like structure of line number and token (or error string) pairs
 --
 -- TODO: Rename (?)
 -- TODO: Use Integral for line number (?)
 --
-type OBJ = [OBJRow]
+type OBJ m f s i = m (OBJRow m f s i)
 
 -- MTL parser types ------------------------------------------------------------------------------------------------------------------------
 
@@ -89,33 +90,33 @@ type OBJ = [OBJRow]
 -- TODO: Is the alpha channel optional, ignored, disallowed?
 -- TODO: Include support for ('Ns', 'Ni', 'd', 'Tr', 'illum')
 --
-data MTLToken = Ambient  Float Float Float (Maybe Float) | -- Ka
-                Diffuse  Float Float Float (Maybe Float) | -- Kd
-                Specular Float Float Float (Maybe Float) | -- Ks
+data MTLToken f s = Ambient  f f f (Maybe f) | -- Ka
+                    Diffuse  f f f (Maybe f) | -- Kd
+                    Specular f f f (Maybe f) | -- Ks
 
-                MapDiffuse  String | -- map_Kd
-                NewMaterial String   -- newmtl
-                deriving (Eq, Show)
+                    MapDiffuse  s | -- map_Kd
+                    NewMaterial s   -- newmtl
+                    deriving (Eq, Show)
 
 
 -- |
 -- TODO: Rename (?)
-data MTLNoParse = MTLComment String | MTLEmpty | MTLNoSuchAttribute String | MTLNoParse String deriving (Show)
+data MTLNoParse s = MTLComment s | MTLEmpty | MTLNoSuchAttribute s | MTLNoParse s deriving (Show)
 
 
 -- | Output type of the single-row MTL parser.
-type MTLRow = (Int, Either MTLNoParse MTLToken, String)
+type MTLRow f s i = (i, Either (MTLNoParse s ) (MTLToken f s), s)
 
 
 -- | Output type of the MTL parser. Currently a list of line number and token (or error string) pairs
 --
 -- TODO: Add type for processed MTL (eg. a map between names and materials)
 --
-type MTL = [MTLRow] -- (line number, MTL token, comment)
+type MTL m f s i = m (MTLRow f s i) -- (line number, MTL token, comment)
 
 
 -- |
-type MTLTable = Map.Map String (Map.Map String Material)
+type MTLTable f s = Map.Map s (Map.Map s (Material f s))
 
 -- Model -----------------------------------------------------------------------------------------------------------------------------------
 
@@ -130,15 +131,10 @@ type MTLTable = Map.Map String (Map.Map String Material)
 -- newtype Normals   = Normals   [Maybe (Vector Float)]
 -- newtype Materials = Materials [Material]
 
-type Vertices  = [Vector Float]
-type TexCoords = [Maybe (Point Float)]
-type Normals   = [Maybe (Vector Float)]
-type Materials = [Material]
-
--- General types ---------------------------------------------------------------------------------------------------------------------------
-
-type Vector num = (num, num, num) -- Queen Vectoria
-type Point  num = (num, num)      -- Haskell is no longer Point-free
+type Vertices  m f   = m (Vector f)
+type TexCoords m     = m (Maybe (Point  f))
+type Normals   m     = m (Maybe (Vector f))
+type Materials m f s = m (Material f s)
 
 -- API types -------------------------------------------------------------------------------------------------------------------------------
 
@@ -147,18 +143,18 @@ type Point  num = (num, num)      -- Haskell is no longer Point-free
 -- TOOD: Pack indices in a tuple (eg. indices :: [(Int, Int, Int)]) (?)
 -- TOOD: Use (String, String) for the names of the mtl file and material instead of Material (?)
 -- TODO: Use types so as not to confuse the indices (eg. newtype INormal, newtype ITexcoord)
-data Face = Face { indices :: [(Int, Maybe Int, Maybe Int)], material :: Material } deriving (Show)
+data Face m f s i = Face { indices :: m (i, Maybe i, Maybe i), material :: Material m f s } deriving (Show)
 
 
 -- |
-type Colour = (Float, Float, Float, Float)
+data Colour f = Colour { red :: f, green :: f, blue :: f, alpha :: f }
 
 
 -- |
 -- TODO: Do all materials have an ambient, a diffuse and a specular colour (?)
 -- TODO: Support more attributes (entire spec) (?)
 -- TODO: Lenses (?)
-data Material = Material { ambient :: Colour, diffuse :: Colour, specular :: Colour, texture :: Maybe String } deriving (Show)
+data Material f s = Material { ambient :: Colour f, diffuse :: Colour f, specular :: Colour f, texture :: Maybe s } deriving (Show)
 
 
 -- | Abstract representation of an OBJ model with associated MTL definitions.
@@ -170,36 +166,36 @@ data Material = Material { ambient :: Colour, diffuse :: Colour, specular :: Col
 -- TODO: Reconsider the types (especially of the materials)
 -- TODO: Rename accessor functions (eg. texcoords instead of textures) (?)
 --
-data Model = Model { vertices  :: [Vector Float],
-                     normals   :: [Vector Float],
-                     texcoords :: [Point  Float],
-                     faces     :: [Face],
-                     materials :: MTLTable, -- TODO: Type synonym (?)
-                     groups    :: Map.Map [String] (Int, Int), -- TODO: Type synonym
-                     objects   :: Map.Map [String] (Int, Int)  -- TODO: Type synonym
-                   } deriving (Show)
+data Model m f s i = Model { vertices  :: m (Vector f),
+                             normals   :: m (Vector f),
+                             texcoords :: m (Point  f),
+                             faces     :: m f,
+                             materials :: MTLTable f s,         -- TODO: Type synonym (?)
+                             groups    :: Map.Map (m s) (i, i), -- TODO: Type synonym
+                             objects   :: Map.Map (m s) (i, i)  -- TODO: Type synonym
+                            } deriving (Show)
 
 -- Foreign ---------------------------------------------------------------------------------------------------------------------------------
 
--- |
-newtype COBJ = COBJ OBJ
-
-
--- |
-newtype CMTL = CMTL MTL
-
-
--- | We
-instance Storable COBJ where
-  sizeOf    = const 0
-  alignment = const 0
-  peek _    = error "Work in progress"
-  poke _    = error "Work in progress"
-
-
--- | We
-instance Storable CMTL where
-  sizeOf    = const 0
-  alignment = const 0
-  peek _    = error "Work in progress"
-  poke _    = error "Work in progress"
+-- -- |
+-- newtype COBJ = COBJ OBJ
+--
+--
+-- -- |
+-- newtype CMTL = CMTL MTL
+--
+--
+-- -- | We
+-- instance Storable COBJ where
+--   sizeOf    = const 0
+--   alignment = const 0
+--   peek _    = error "Work in progress"
+--   poke _    = error "Work in progress"
+--
+--
+-- -- | We
+-- instance Storable CMTL where
+--   sizeOf    = const 0
+--   alignment = const 0
+--   peek _    = error "Work in progress"
+--   poke _    = error "Work in progress"

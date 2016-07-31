@@ -54,7 +54,7 @@ import Graphics.WaveFront.Utilities
 --
 -- TODO: Use bytestrings (?)
 --
-loadOBJ :: String -> IO OBJ
+loadOBJ :: String -> IO (OBJ m f s i)
 loadOBJ fn = do
   rawOBJ <- readFile fn    --
   return $ parseOBJ rawOBJ --
@@ -75,6 +75,7 @@ loadMTL fn = do
 -- TODO: Better names (than 'mtls' and 'fns') (?)
 -- TODO: Refactor, simplify
 -- TODO: Improve path handling (cf. '</>')
+-- TODO: Graceful error handling
 loadMaterials :: [String] -> IO MTLTable
 loadMaterials fns = do
   mtls <- mapM loadMTL fns --
@@ -83,6 +84,7 @@ loadMaterials fns = do
 
 
 -- | Loads an OBJ model from file, including associated materials
+-- TODO: Graceful error handling
 loadModel :: String -> IO Model
 loadModel fn = do
   obj       <- loadOBJ fn
