@@ -132,8 +132,8 @@ type MTLTable f s = Map.Map s (Map.Map s (Material f s))
 -- newtype Materials = Materials [Material]
 
 type Vertices  m f   = m (Vector f)
-type TexCoords m     = m (Maybe (Point  f))
-type Normals   m     = m (Maybe (Vector f))
+type TexCoords m f   = m (Maybe (Point  f))
+type Normals   m f   = m (Maybe (Vector f))
 type Materials m f s = m (Material f s)
 
 -- API types -------------------------------------------------------------------------------------------------------------------------------

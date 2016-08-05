@@ -53,7 +53,7 @@ import Graphics.WaveFront.Utilities
 -- |
 --
 -- TODO: Use bytestrings (?)
---
+-- TODO: Deal with IO and parsing errors
 loadOBJ :: String -> IO (OBJ m f s i)
 loadOBJ fn = do
   rawOBJ <- readFile fn    --
@@ -64,7 +64,7 @@ loadOBJ fn = do
 --
 -- TODO: Use bytestrings (?)
 -- TODO: Merge OBJ and MTL parsers (and plug in format-specific code as needed) (?)
---
+-- TODO: Deal with IO and parsing errors
 loadMTL :: String -> IO MTL
 loadMTL fn = do
   rawMTL <- readFile fn    -- Unparsed MTL data (text)
