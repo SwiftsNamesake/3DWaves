@@ -87,7 +87,9 @@ import qualified Data.Set as Set
 
 import qualified Text.Parsec as Parsec
 import           Text.Parsec                   ((<?>), (<|>), ParsecT, Stream, char)
+import qualified Text.Parsec.Combinator        (choice)
 import           Text.ParserCombinators.Parsec (floating3)
+
 
 import Text.Read     (readMaybe, readEither)
 import Control.Monad (liftM)
@@ -140,30 +142,49 @@ parseOBJ = enumerate . map parseOBJRow . lines -- . rows
 -- TODO: Strip trailing comments (✓)
 -- TODO: Don't ignore leftover values (errors?) (...)
 --
-parseOBJRow :: String -> (Int -> OBJRow) -- Maybe OBJToken
-parseOBJRow ln = parseTokenWith ln $ \ line -> let (attr:values) = words line in case (attr:values) of
-    ("f":_:_:_:_)      -> either (Left . noparse . const line) (Right . OBJFace) . sequence . map (ivertex . cuts '/') $ values -- Face
-    ["v",  sx, sy, sz] -> vector (\ [x, y, z] -> OBJVertex  x y z) [sx, sy, sz] (noparse line)                                  -- Vertex
-    ["vn", sx, sy, sz] -> vector (\ [x, y, z] -> OBJNormal  x y z) [sx, sy, sz] (noparse line)                                  -- Normal
-    ["vt", sx, sy]     -> vector (\ [x, y]    -> OBJTexture x y)   [sx, sy]     (noparse line)                                  -- Texture
-    ("g":_:_)          -> Right $ Group  values                                 -- Group
-    ("o":_:_)          -> Right $ Object values                                 -- Object
-    ("s":_:_)          -> Left  $ noparse line                                  -- Smooth shading (TODO: Don't ignore)
-    ["mtllib", lib]    -> Right $ LibMTL lib                                    --
-    ["usemtl", mtl]    -> Right $ UseMTL mtl                                    --
-    _                  -> Left  $ noparse line                                  -- TODO: More informative errors
-    where
-      -- ivertex :: [String] -> Either OBJNoParse OBJToken
-      ivertex [svi, sti, sni] = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, readMaybe sni) -- TODO: Refactor, simplify
-      ivertex [svi, sti]      = readEither svi >>= \ vi -> Right $ (vi, readMaybe sti, Nothing)       -- TODO: Refactor, simplify
-      ivertex [svi]           = readEither svi >>= \ vi -> Right $ (vi, Nothing,       Nothing)       -- TODO: Refactor, simplify
-      ivertex _               = Left ln
+-- TODO: Use ListLike or Monoid (or maybe Indexable, since that's the real requirement) (?)
+parseOBJRow :: (Stream s' Identity Char, Monoid m, RealFloat f, IsString s, Integral i) => ParsecT s' u Identity (OBJ m f s i)
+parseOBJRow = Parsec.choice [string "f" >> atleast 3 (whitespace >> ivertex) >>= return . OBJFace,        -- Face
+                             -- TODO: How to deal with common prefix (v, vn, vt)
+                             string "v"  >> point3D OBJVertex,                                            -- Vertex
+                             string "vn" >> point3D OBJNormal,                                            -- Normal
+                             string "vt" >> point2D OBJTexture,                                           -- Texture
+                             string "o"  >> wordWith Object, -- Object
+                             string "g"  >> wordWith Group,  -- Group
+                             -- string "s" -- Smooth shading (TODO: Don't ignore)
+                             string "mtllib" >> wordsWith LibMTL, --
+                             string "usemtl" >> wordsWith UseMTL] --
+              -- >> Parsec.endOfLine
+  where
+    ivertex = do vi <- Parsec.number
+                 Parsec.char '/';
+                 ni <- Parsec.optionMaybe Parsec.number
+                 Parsec.char '/'
+                 ti <- Parsec.optionMaybe Parsec.number } -- A single vertex definition with indices for vertex position, normal, and texture coordinates
+                 return (vi, ni, ti)
 
-      noparse line
-        | null line || all isSpace line = OBJEmpty
-        | isComment line                = OBJComment line
-        | otherwise                     = OBJNoParse line
+    string       = Parsec.string
+    whitespace   = Parsec.many1 (Parsec.anyOf ['\t', ' ']) -- Consumes atleast one white space character (not including newlines and carriage returns)
+    floating     = whitespace >> ap Parsec.sign Parsec.floating3     --
+    
+    wordWith f = do word <- Parsec.many1 (whitespace >> Parsec.word)
+                    return $ f word
+                    
+    wordsWith f = do thewords <- Parsec.many1 (whitespace >> Parsec.word)
+                     return $ f thewords
 
+    point3D f = do [x,y,z] <- Parsec.count 3 (whitespace >> floating) -- TODO: What happens when pattern match fails (?)
+                   return $ f x y z
+
+    point2D f = do [x,y] <- Parsec.count 2 (whitespace >> floating) -- TODO: What happens when pattern match fails (?)
+                   return $ f x y
+
+    atleast n p = do first <- Parsec.count n p
+                     rest  <- Parsec.many p
+                     return first ++ rest
+  -- Parsec.string "f" -- | null line || all isSpace line = OBJEmpty
+  -- Parsec.string "f" -- | isComment line                = OBJComment line
+  -- Parsec.string "f" -- | otherwise                     = OBJNoParse line
 
 -- | Returns a list of annotated parsing errors or the original OBJ data structure if
 -- validateOBJ :: OBJ -> Either [OBJNoParse] OBJ

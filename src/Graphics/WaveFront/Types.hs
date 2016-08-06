@@ -60,6 +60,7 @@ data OBJToken m f s i = OBJVertex  f f f |
                         UseMTL s | --
                         LibMTL s | -- TODO: Use actual MTL type
 
+                        -- TODO: Use OBJ prefix (?)
                         Group  (m s) |   -- TODO: Do grouped faces have to be consecutive?
                         Object (m s)     -- TODO: What is the difference between group and object?
                         deriving (Eq, Show) -- TODO: Derive Read (?)
