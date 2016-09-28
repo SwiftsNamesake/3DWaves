@@ -36,7 +36,6 @@ module Graphics.WaveFront.Types where
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
 import qualified Data.Map as Map
-import Cartesian.Space.Types (Vertex3D(..))
 import Foreign.Storable
 
 
@@ -55,7 +54,7 @@ import Foreign.Storable
 data OBJToken m f s i = OBJVertex  f f f |
                         OBJNormal  f f f |
                         OBJTexture f f   |
-                        OBJFace (m (i, Maybe i, Maybe i)) | -- TODO: Associate material with each face, handle absent indices
+                        OBJFace (m (VertexIndices i)) | -- TODO: Associate material with each face, handle absent indices
 
                         UseMTL s | --
                         LibMTL s | -- TODO: Use actual MTL type
@@ -64,6 +63,8 @@ data OBJToken m f s i = OBJVertex  f f f |
                         Group  (m s) |   -- TODO: Do grouped faces have to be consecutive?
                         Object (m s)     -- TODO: What is the difference between group and object?
                         deriving (Eq, Show) -- TODO: Derive Read (?)
+
+type VertexIndices i = (i, Maybe i, Maybe i)
 
 
 -- |
@@ -144,18 +145,32 @@ type Materials m f s = m (Material f s)
 -- TOOD: Pack indices in a tuple (eg. indices :: [(Int, Int, Int)]) (?)
 -- TOOD: Use (String, String) for the names of the mtl file and material instead of Material (?)
 -- TODO: Use types so as not to confuse the indices (eg. newtype INormal, newtype ITexcoord)
-data Face m f s i = Face { indices :: m (i, Maybe i, Maybe i), material :: Material m f s } deriving (Show)
+data Face m f s i = Face {
+  indices  :: m (VertexIndices i),
+  material :: Material m f s
+} deriving (Show)
 
 
 -- |
-data Colour f = Colour { red :: f, green :: f, blue :: f, alpha :: f }
+-- TODO: Use a type from the colour package instead (?)
+data Colour f = Colour {
+  red   :: f,
+  green :: f,
+  blue  :: f,
+  alpha :: f
+}
 
 
 -- |
 -- TODO: Do all materials have an ambient, a diffuse and a specular colour (?)
 -- TODO: Support more attributes (entire spec) (?)
 -- TODO: Lenses (?)
-data Material f s = Material { ambient :: Colour f, diffuse :: Colour f, specular :: Colour f, texture :: Maybe s } deriving (Show)
+data Material f s = Material {
+  ambient  :: Colour f,
+  diffuse  :: Colour f,
+  specular :: Colour f,
+  texture  :: Maybe s
+} deriving (Show)
 
 
 -- | Abstract representation of an OBJ model with associated MTL definitions.
@@ -167,14 +182,15 @@ data Material f s = Material { ambient :: Colour f, diffuse :: Colour f, specula
 -- TODO: Reconsider the types (especially of the materials)
 -- TODO: Rename accessor functions (eg. texcoords instead of textures) (?)
 --
-data Model m f s i = Model { vertices  :: m (Vector f),
-                             normals   :: m (Vector f),
-                             texcoords :: m (Point  f),
-                             faces     :: m f,
-                             materials :: MTLTable f s,         -- TODO: Type synonym (?)
-                             groups    :: Map.Map (m s) (i, i), -- TODO: Type synonym
-                             objects   :: Map.Map (m s) (i, i)  -- TODO: Type synonym
-                            } deriving (Show)
+data Model m f s i = Model {
+  vertices  :: m (Vector f),
+  normals   :: m (Vector f),
+  texcoords :: m (Point  f),
+  faces     :: m f,
+  materials :: MTLTable f s,         -- TODO: Type synonym (?)
+  groups    :: Map.Map (m s) (i, i), -- TODO: Type synonym
+  objects   :: Map.Map (m s) (i, i)  -- TODO: Type synonym
+} deriving (Show)
 
 -- Foreign ---------------------------------------------------------------------------------------------------------------------------------
 

@@ -21,7 +21,9 @@ Jonatan H Sundqvist
 See source files (.hs) for additional items.
 
 - [ ] Use Parsec instead (branch off) (?)
+- [ ] Performance (currently, it's atrocious)
 - [ ] Add sample models and demos
-- [ ] Add profiling and checks
+- [ ] Add profiling and checks (cf. QuickCheck)
 - [ ] GHCi support
 - [ ] Proper ticket system
+- [ ] Polymorphism

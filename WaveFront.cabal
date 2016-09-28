@@ -58,15 +58,16 @@ library
   other-extensions:    UnicodeSyntax, TupleSections, ForeignFunctionInterface
 
   -- Other library packages from which modules are imported.
-  build-depends:       base == 4.*,
-                       lens <= 4.13.0.0,
-                       OpenGL,
-                       GLUtil,
-                       linear,
-                       parsec,
-                       filepath,
-                       containers,
-                       Cartesian
+  build-depends:         base == 4.*
+                       , lens <= 4.13.0.0
+                       , OpenGL
+                       , GLUtil
+                       , linear
+                       , attoparsec
+                       , filepath
+                       , containers
+                       , QuickCheck
+                       , Cartesian
 
   -- Directories containing source files.
   hs-source-dirs:      src

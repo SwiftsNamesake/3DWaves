@@ -11,4 +11,5 @@ packages:
 - '.'
 - location:
     git: https://github.com/SwiftsNamesake/Cartesian.git
-    commit: eb63b0f888fe6e0ec25e94c8f2c537fd07584e55
+    commit: dff47a12ee7a514ac44c8fb7f3eae8cf84a961d0
+            

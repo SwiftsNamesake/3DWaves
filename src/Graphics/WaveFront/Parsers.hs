@@ -95,9 +95,9 @@ import Text.Read     (readMaybe, readEither)
 import Control.Monad (liftM)
 import Control.Lens hiding (indices)
 
--- import Southpaw.Utilities.Utilities (pairwise, cuts)
+import Linear.V3 (V3(..))
 
-import Cartesian.Space.Types (BoundingBox(..), Vector3D(..))
+import Cartesian.Space.Types (BoundingBox(..))
 
 import Graphics.WaveFront.Types
 import Graphics.WaveFront.Utilities
