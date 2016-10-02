@@ -48,7 +48,7 @@ cabal-version:       >=1.10
 
 library
   -- Modules exported by the library.
-  exposed-modules:     Graphics.WaveFront.Types, Graphics.WaveFront.Utilities, Graphics.WaveFront.Parsers, Graphics.WaveFront.Load,
+  exposed-modules:     Graphics.WaveFront.Types, Graphics.WaveFront.Parse, Graphics.WaveFront.Load,
                        Graphics.WaveFront.Foreign
 
   -- Modules included in this library but not exported.
@@ -59,10 +59,11 @@ library
 
   -- Other library packages from which modules are imported.
   build-depends:         base == 4.*
-                       , lens <= 4.13.0.0
+                       , lens <= 4.14
                        , OpenGL
                        , GLUtil
                        , linear
+                       , text
                        , attoparsec
                        , filepath
                        , containers

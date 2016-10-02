@@ -1,5 +1,5 @@
 -- |
--- Module      : Graphics.WaveFront.Parsers
+-- Module      : Graphics.WaveFront.Parse
 -- Description :
 -- Copyright   : (c) Jonatan H Sundqvist, February 8 2015
 -- License     : MIT
@@ -15,6 +15,7 @@
 --        - Grammar specification
 --        - Incremental parsing (?)
 --        - Improve naming scheme
+--          -- Remove 'parse-' prefix, import qualified (eg. 'Parse.obj')
 --
 --        - Separate MTL and OBJ parsers (?) (...)
 --        - Separate parsing, processing, logging, IO and testing (...)
@@ -24,7 +25,7 @@
 --        - FFI (...)
 --        - Debugging information (line number, missing file, missing values, etc.) (...)
 --        - Proper Haddock coverage, including headers (...)
---        - Model type (...)
+--        - Model type (✓)
 --        - Caching (?)
 --        - Performance, profiling, optimisations
 --          -- Strict or lazy (eg. with Data.Map) (?)
@@ -41,7 +42,7 @@
 --          -- Do the usemtl and libmtl statements affect vertices or faces (?)
 --
 --        - Parser bugs
---          -- Negative coordinates enclosed in parentheses
+--          -- Negative coordinates enclosed in parentheses (...)
 --
 --        - Decide on a public interface (exports) (API)
 --          -- Model will be the main API type
@@ -57,51 +58,55 @@
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- GHC Extensions
 --------------------------------------------------------------------------------------------------------------------------------------------
-{-# LANGUAGE UnicodeSyntax #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE UnicodeSyntax     #-}
+{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NamedFieldPuns    #-}
 
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- Section
 --------------------------------------------------------------------------------------------------------------------------------------------
-module Graphics.WaveFront.Parsers (parseOBJ, parseMTL,
-                                   facesOf,  materialsOf,
-                                   modelAttributes, tessellate, boundingbox,
-                                   hasTextures, textures,
-                                   module Graphics.WaveFront.Types,
-                                   BoundingBox(..), Vector(..),
-                                   createModel, createMTLTable) where
+-- TODO: Clean this up
+module Graphics.WaveFront.Parse (
+  parseOBJ, parseMTL,
+  facesOf,  materialsOf,
+  modelAttributes, tessellate, boundingbox,
+  hasTextures, textures,
+  module Graphics.WaveFront.Types, -- TODO: Don't export internal types (duh)
+  BoundingBox(..),
+  createModel, createMTLTable
+) where
 
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
+import           Data.Int    (Int64)
 import           Data.List   (groupBy, unzip4)
 import           Data.Maybe  (listToMaybe, catMaybes)
 import           Data.Either (rights)
 import           Data.Char   (isSpace)
-import qualified Data.Map as Map
-import qualified Data.Set as Set
+import qualified Data.Map  as M
+import qualified Data.Set  as S
+import qualified Data.Text as T
 
-import qualified Text.Parsec as Parsec
-import           Text.Parsec                   ((<?>), (<|>), ParsecT, Stream, char)
-import qualified Text.Parsec.Combinator        (choice)
-import           Text.ParserCombinators.Parsec (floating3)
+import qualified Data.Attoparsec.Text       as Atto
+import qualified Data.Attoparsec.Combinator as Atto
 
+import Control.Monad       (liftM)
+import Control.Lens ((^.), _1, _2, _3)
+import Control.Applicative (pure, liftA2, (<$>), (<*>), (<*), (*>), (<|>))
 
-import Text.Read     (readMaybe, readEither)
-import Control.Monad (liftM)
-import Control.Lens hiding (indices)
-
+import Linear.V2 (V2(..))
 import Linear.V3 (V3(..))
 
-import Cartesian.Space.Types (BoundingBox(..))
+import Cartesian.Types  (BoundingBox(..))
+import Cartesian.Lenses (x, y, z)
 
 import Graphics.WaveFront.Types
-import Graphics.WaveFront.Utilities
-
 
 
 
@@ -120,14 +125,13 @@ import Graphics.WaveFront.Utilities
 -- TODO: Should this function separate the various fields (eg. [(Vertices, Faces, Materials, Groups)] instead of [Maybe OBJToken])
 --
 -- format :: (Stream s' Identity Char) => ParsecT s' u Identity (FormatToken)
-parseOBJ :: (Stream s' Identity Char) => ParsecT s' u Identity (OBJ m)
-parseOBJ = enumerate . map parseOBJRow . lines -- . rows
+parseOBJ :: Atto.Parser (SimpleOBJ)
+parseOBJ = Atto.sepBy parseOBJRow lineSeparator <* Atto.endOfInput
 
 
--- | Generates a token given a single valid OBJ row, or an error value if the input is malformed.
+-- | Parses a token given a single valid OBJ row, or an error value if the input is malformed.
 --
 -- TODO: Correctness (total function, no runtime exceptions)
--- TODO: Rename 'which' (?)
 -- TODO: Handle invalid rows (how to deal with mangled definitions w.r.t indices?)
 -- TODO: Extract value parsing logic (eg. pattern matching, converting, handle errors)
 
@@ -143,58 +147,123 @@ parseOBJ = enumerate . map parseOBJRow . lines -- . rows
 -- TODO: Don't ignore leftover values (errors?) (...)
 --
 -- TODO: Use ListLike or Monoid (or maybe Indexable, since that's the real requirement) (?)
-parseOBJRow :: (Stream s' Identity Char, Monoid m, RealFloat f, IsString s, Integral i) => ParsecT s' u Identity (OBJ m f s i)
-parseOBJRow = Parsec.choice [string "f" >> atleast 3 (whitespace >> ivertex) >>= return . OBJFace,        -- Face
-                             -- TODO: How to deal with common prefix (v, vn, vt)
-                             string "v"  >> point3D OBJVertex,                                            -- Vertex
-                             string "vn" >> point3D OBJNormal,                                            -- Normal
-                             string "vt" >> point2D OBJTexture,                                           -- Texture
-                             string "o"  >> wordWith Object, -- Object
-                             string "g"  >> wordWith Group,  -- Group
-                             -- string "s" -- Smooth shading (TODO: Don't ignore)
-                             string "mtllib" >> wordsWith LibMTL, --
-                             string "usemtl" >> wordsWith UseMTL] --
-              -- >> Parsec.endOfLine
+parseOBJRow :: Atto.Parser (SimpleOBJToken)
+parseOBJRow = token <* ignore comment -- TODO: Let the separator handle comments (?)
   where
-    ivertex = do vi <- Parsec.number
-                 Parsec.char '/';
-                 ni <- Parsec.optionMaybe Parsec.number
-                 Parsec.char '/'
-                 ti <- Parsec.optionMaybe Parsec.number } -- A single vertex definition with indices for vertex position, normal, and texture coordinates
-                 return (vi, ni, ti)
-
-    string       = Parsec.string
-    whitespace   = Parsec.many1 (Parsec.anyOf ['\t', ' ']) -- Consumes atleast one white space character (not including newlines and carriage returns)
-    floating     = whitespace >> ap Parsec.sign Parsec.floating3     --
+    -- Parses an OBJ token
+    token :: Atto.Parser (SimpleOBJToken)
+    token = (Atto.string "f"  *> face)    <|> --
+            -- TODO: How to deal with common prefix (v, vn, vt) (backtrack?)
+            (Atto.string "vn" *> normal)  <|>
+            (Atto.string "vt" *> texture) <|>
+            (Atto.string "v"  *> vertex)  <|>
+            (Atto.string "o"  *> object)  <|>
+            (Atto.string "g"  *> group)   <|>
+            -- Atto.string "s" -- Smooth shading (TODO: Don't ignore)
+            (Atto.string "mtllib" *> lib) <|>
+            (Atto.string "usemtl" *> use)
     
-    wordWith f = do word <- Parsec.many1 (whitespace >> Parsec.word)
-                    return $ f word
-                    
-    wordsWith f = do thewords <- Parsec.many1 (whitespace >> Parsec.word)
-                     return $ f thewords
+    -- TODO: Expose these parsers for testing purposes (?)
+    face    = OBJFace    <$> atleast 3 (space *> ivertex)
+    normal  = OBJNormal  <$> point3D
+    texture = OBJTexture <$> point2D
+    vertex  = OBJVertex  <$> point3D
+    
+    object  = Object <$> atleast 1 (space *> word)
+    group   = Group  <$> atleast 1 (space *> word)
 
-    point3D f = do [x,y,z] <- Parsec.count 3 (whitespace >> floating) -- TODO: What happens when pattern match fails (?)
-                   return $ f x y z
+    lib = LibMTL <$> (space *> word)
+    use = UseMTL <$> (space *> word)
 
-    point2D f = do [x,y] <- Parsec.count 2 (whitespace >> floating) -- TODO: What happens when pattern match fails (?)
-                   return $ f x y
+    -- A single vertex definition with indices for vertex position, normal, and texture coordinates
+    -- TODO: Should the slashes be optional?
+    ivertex = VertexIndices <$>
+                (Atto.decimal          <* Atto.char '/') <*>
+                (optional Atto.decimal <* Atto.char '/') <*>
+                (optional Atto.decimal)
+    
+-- Jon's little helpers --------------------------------------------------------------------------------------------------------------------
 
-    atleast n p = do first <- Parsec.count n p
-                     rest  <- Parsec.many p
-                     return first ++ rest
-  -- Parsec.string "f" -- | null line || all isSpace line = OBJEmpty
-  -- Parsec.string "f" -- | isComment line                = OBJComment line
-  -- Parsec.string "f" -- | otherwise                     = OBJNoParse line
+-- |
+-- TODO: Make sure this is right
+-- OBJ rows may be separated by one or more lines of comments and whitespace, or empty lines.
+lineSeparator :: Atto.Parser ()
+lineSeparator = Atto.skipMany1 $ ignore space *> ignore comment *> Atto.endOfLine
 
--- | Returns a list of annotated parsing errors or the original OBJ data structure if
--- validateOBJ :: OBJ -> Either [OBJNoParse] OBJ
--- validateOBJ _ = undefined
+
+-- |
+comment :: Atto.Parser T.Text
+comment = Atto.skipSpace *> Atto.char '#' *> Atto.takeTill (\c -> (c == '\r') || (c == '\n')) -- TODO: Is the newline consumed (?)
+
+
+-- |
+-- TODO: Use 'try' to enforce backtracking (?)
+optional :: Atto.Parser a -> Atto.Parser (Maybe a)
+optional p = Atto.option Nothing (Just <$> p)
+
+
+-- | Like Atto.skipMany, except it skips one match at the most
+ignore :: Atto.Parser a -> Atto.Parser ()
+ignore p = optional p *> pure ()
+
+
+-- | 
+atleast :: Int -> Atto.Parser a -> Atto.Parser [a]
+atleast n p = liftA2 (++) (Atto.count n p) (Atto.many' p)
+
+
+-- | Skips atleast one white space character (not including newlines and carriage returns)
+space :: Atto.Parser ()
+space = Atto.skipMany1 (Atto.satisfy isLinearSpace)
+
+
+-- |
+-- TODO: Unicode awareness (cf. Data.Char.isSpace)
+isLinearSpace :: Char -> Bool
+isLinearSpace c = (c == ' ') || (c == '\t')
+
+
+-- |
+word :: Atto.Parser T.Text
+word = T.pack <$> Atto.many1 Atto.letter
+
+
+-- |
+parenthesised :: Atto.Parser a -> Atto.Parser a
+parenthesised p = Atto.char '(' *> p <* Atto.char ')'
+
+
+-- |
+-- TODO: Polymorphic
+coord :: Fractional f => Atto.Parser f
+coord = space *> (parenthesised Atto.rational <|> Atto.rational)
+
+
+-- | Parser a single colour channel
+-- TODO: Clamp to [0,1] (cf. partial from monadplus) (?)
+channel :: Fractional f => Atto.Parser f
+channel = space *> (parenthesised Atto.rational <|> Atto.rational)
+
+
+-- |
+colour :: Fractional f => Atto.Parser (Colour f)
+colour = Colour <$> channel <*> channel <*> channel <*> Atto.option 1 channel
+
+
+-- | 
+point3D :: Atto.Parser (V3 Double)
+point3D = V3 <$> coord <*> coord <*> coord
+
+
+-- |
+point2D :: Atto.Parser (V2 Double)
+point2D = V2 <$> coord <*> coord
 
 -- MTL parsing -----------------------------------------------------------------------------------------------------------------------------
 
 -- | Produces a list of MTL tokens, with associated line numbers and comments
-parseMTL :: String -> MTL
-parseMTL = enumerate . map parseMTLRow . lines
+parseMTL :: Atto.Parser (SimpleMTL)
+parseMTL = Atto.sepBy parseMTLRow lineSeparator <* Atto.endOfInput
 
 
 -- | Parses a single MTL row.
@@ -203,56 +272,62 @@ parseMTL = enumerate . map parseMTLRow . lines
 -- TOOD: Process the MTL tokens (✗)
 -- TODO: cf. parseOBJRow
 --
-parseMTLRow :: String -> (Int -> MTLRow)
-parseMTLRow ln = parseTokenWith ln $ \ line  -> let (which:values) = words line in case which:values of
-    ("Ka":sr:sg:sb:rest) -> withChannels Ambient  sr sg sb rest line -- Ka
-    ("Kd":sr:sg:sb:rest) -> withChannels Diffuse  sr sg sb rest line -- Kd
-    ("Ks":sr:sg:sb:rest) -> withChannels Specular sr sg sb rest line -- Ks
-    ["map_Kd", name]     -> Right $ MapDiffuse  name                 -- map_Kd
-    ["newmtl", name]     -> Right $ NewMaterial name                 -- newmtl
-    _                    -> Left  $ noparse line                     --
+parseMTLRow :: Atto.Parser (SimpleMTLToken)
+parseMTLRow = token <* ignore comment
     where
-      withChannels f sr sg sb []   line = vector (\[r, g, b] -> f r g b Nothing)        [sr, sg, sb] (noparse line) -- TODO: Refactor, simplify
-      withChannels f sr sg sb [sa] line = vector (\[r, g, b] -> f r g b $ readMaybe sa) [sr, sg, sb] (noparse line) -- TODO: Refactor, simplify
-      withChannels _ _  _  _   _   line = Left $ noparse line
+      -- TODO: How to deal with common prefix (Ka, Kd, Ks) (backtrack?)
+      token = (Atto.string "Ka"     *> ambient)     <|>
+              (Atto.string "Kd"     *> diffuse)     <|>
+              (Atto.string "Ks"     *> specular)    <|>
+              (Atto.string "map_Kd" *> mapDiffuse)  <|>
+              (Atto.string "newmtl" *> newMaterial)
 
-      noparse line
-        | null line || all isSpace line = MTLEmpty
-        | isComment line                = MTLComment line
-        | otherwise                     = MTLNoParse line
+      -- TODO: Expose these parsers for testing purposes (?)
+      ambient  = space *> (Ambient  <$> colour)
+      diffuse  = space *> (Diffuse  <$> colour)
+      specular = space *> (Specular <$> colour)
+
+      mapDiffuse  = space *> (MapDiffuse  <$> word)
+      newMaterial = space *> (NewMaterial <$> word)
 
 -- Parser output churners (OBJ) ------------------------------------------------------------------------------------------------------------
+
+-- TODO: Move to separate module (eg. WaveFront.Model)
 
 -- | Creates a mapping between group names and the corresponding bounds ([lower, upper)). Invalid
 --   tokens are simply discarded by this function.
 --
 -- TODO: Figure out how to deal with multiple group names (eg. "g mesh1 nose head")
-groupsOf :: [OBJToken] -> Map.Map [String] (Int, Int)
+groupsOf :: [SimpleOBJToken] -> M.Map [T.Text] (Int64, Int64)
 groupsOf = buildIndexMapWith . filter notObject
-  where notObject (Object _) = False
-        notObject  _         = True
+  where
+    notObject (Object _) = False
+    notObject  _         = True
 
 
 -- |
-objectsOf :: [OBJToken] -> Map.Map [String] (Int, Int)
+objectsOf :: [SimpleOBJToken] -> M.Map [T.Text] (Int64, Int64)
 objectsOf = buildIndexMapWith . filter notGroup
-  where notGroup (Group _) = False
-        notGroup  _        = True
+  where
+    notGroup (Group _) = False
+    notGroup  _        = True
 
 
 -- | Creates a mapping between names (of groups or objects) to face indices
 --
 -- TODO: Refactor, simplify
 --
-buildIndexMapWith :: [OBJToken] -> Map.Map [String] (Int, Int)
-buildIndexMapWith tokens = Map.fromList . pairwise zipIndices . reverse . addLastIndex $ foldl update (0, []) $ tokens
-  where addLastIndex (nfaces, groups') = ([], nfaces):groups'
-        zipIndices (names, low) (_, upp) = (names, (low, upp))
-        update (nfaces, groups') token = case token of
-          Group   names -> (nfaces,   (names, nfaces):groups')
-          Object  names -> (nfaces,   (names, nfaces):groups')
-          OBJFace _     -> (nfaces+1, groups')
-          _             -> (nfaces,   groups')
+buildIndexMapWith :: [SimpleOBJToken] -> M.Map [T.Text] (Int64, Int64)
+buildIndexMapWith tokens = M.fromList . pairwise zipIndices . reverse . addLastIndex $ foldl update (0, []) $ tokens
+  where
+    pairwise f xs = zipWith f xs (drop 1 xs)
+    addLastIndex (nfaces, groups') = ([], nfaces):groups'
+    zipIndices (names, low) (_, upp) = (names, (low, upp))
+    update (nfaces, groups') token = case token of
+      Group   names -> (nfaces,   (names, nfaces):groups')
+      Object  names -> (nfaces,   (names, nfaces):groups')
+      OBJFace _     -> (nfaces+1, groups')
+      _             -> (nfaces,   groups')
 
 
 -- | Filters out faces from a stream of OBJTokens and attaches the currently selected material,
@@ -263,11 +338,11 @@ buildIndexMapWith tokens = Map.fromList . pairwise zipIndices . reverse . addLas
 -- TODO: Improve naming scheme (lots of primes)
 -- TODO: Default material, take 'error-handling' function (?)
 --
-facesOf :: [OBJToken] -> MTLTable -> [Either String Face]
+facesOf :: [SimpleOBJToken] -> SimpleMTLTable -> [Either T.Text SimpleFace]
 facesOf tokens table = reverse . (^._3) . foldl update ("", "", []) $ tokens
-  where retrieve lib mat       = Map.lookup lib table >>= Map.lookup mat
+  where retrieve lib mat       = M.lookup lib table >>= M.lookup mat
         createFace lib mat ind = case retrieve lib mat of
-                                   Nothing -> Left  $ "No such material: " ++ lib ++ "." ++ mat
+                                   Nothing -> Left  $ T.concat ["No such material: ", lib, ".", mat]
                                    Just m  -> Right $ Face { indices=ind, material=m }
         update (lib', material', faces') token = case token of
                                                    OBJFace ind -> (lib', material', createFace lib' material' ind : faces')
@@ -284,27 +359,28 @@ facesOf tokens table = reverse . (^._3) . foldl update ("", "", []) $ tokens
 -- TODO: Pass in error function (would allow for more flexible error handling) (?)
 -- TODO: Filter out parser failures (?)
 -- TOOD: Deal with duplicated attributes (probably won't crop up in any real situations)
-materialsOf :: [MTLToken] -> Map.Map String (Either String Material)
-materialsOf tokens = Map.fromList . rights $ map createMaterial thegroups
+materialsOf :: [SimpleMTLToken] -> M.Map T.Text (Either T.Text SimpleMaterial)
+materialsOf tokens = M.fromList . rights $ map createMaterial thegroups
   where
     thegroups = groupBy (((not . isnew) .) . flip const) tokens -- TODO: Refactor this atrocity
     isnew (NewMaterial _) = True  -- TODO: Rename isnew
     isnew  _              = False
     createMaterial (NewMaterial name:attrs) = Right $ (name, fromAttributes attrs)
-    createMaterial  attrs                   = Left  $ "Free-floating attributes: " ++ show attrs
+    createMaterial  attrs                   = Left  $ T.concat ["Free-floating attributes: ", T.pack . show $ attrs]
     fromAttributes  attrs
       | any null colours = Left  $ "Missing colour(s)" -- TODO: More elaborate message (eg. which colour)
       | otherwise        = Right $ Material { ambient=head amb, diffuse=head diff, specular=head spec, texture=listToMaybe [ name | MapDiffuse name <- attrs ] }
-      where colours@[diff, spec, amb] = [[ (r, g, b, maybe 1.0 id a) | Diffuse  r g b a <- attrs ],
-                                         [ (r, g, b, maybe 1.0 id a) | Specular r g b a <- attrs ],
-                                         [ (r, g, b, maybe 1.0 id a) | Ambient  r g b a <- attrs ]]
+      where 
+        colours@[diff, spec, amb] = [[ c | (Diffuse  c) <- attrs ],
+                                     [ c | (Specular c) <- attrs ],
+                                     [ c | (Ambient  c) <- attrs ]]
 
 
 -- |
 -- TODO: Debug information (eg. how many invalid materials were filtered out)
 -- TODO: Refactor, simplify
-createMTLTable :: [(String, [MTLToken])] -> MTLTable
-createMTLTable mtls = Map.fromList . map (\ (name, tokens) -> (name, Map.mapMaybe prune . materialsOf $ tokens)) $ mtls
+createMTLTable :: [(T.Text, [SimpleMTLToken])] -> SimpleMTLTable
+createMTLTable mtls = M.fromList . map (\ (name, tokens) -> (name, M.mapMaybe prune . materialsOf $ tokens)) $ mtls
   where prune (Right mat) = Just mat
         prune (Left  _)   = Nothing
 
@@ -325,26 +401,29 @@ createMTLTable mtls = Map.fromList . map (\ (name, tokens) -> (name, Map.mapMayb
 --
 -- I never knew pattern matching in list comprehensions could be used to filter by constructor
 -- let rows = parseOBJ data in ([ v | @v(Vertex {}) <- rows], [ v | @v(Vertex {}) <- rows])
-createModel :: OBJ -> MTLTable -> Model
-createModel tokens thematerials = let modeldata  = rights $ map (^._2) tokens -- TODO: Vat do vee du viz ze dissidents, kommandant?
-                                  in Model { vertices  = [ (x, y, z) | OBJVertex  x y z <- modeldata ],
-                                             normals   = [ (x, y, z) | OBJNormal  x y z <- modeldata ],
-                                             texcoords = [ (x, y)    | OBJTexture x y   <- modeldata ],
+createModel :: SimpleOBJ -> SimpleMTLTable -> SimpleModel
+createModel modeldata thematerials = Model { vertices  = [ vec | OBJVertex  vec <- modeldata ],
+                                             normals   = [ vec | OBJNormal  vec <- modeldata ],
+                                             texcoords = [ vec | OBJTexture vec <- modeldata ],
                                              faces     = map tessellate . rights $ facesOf modeldata thematerials,
                                              groups    = groupsOf  modeldata,
                                              objects   = objectsOf modeldata,
                                              materials = thematerials }
 
 
+-- (SimpleVertices, SimpleTexCoords,     [Maybe (V3 Double)],  SimpleMaterials)
+-- ([V3 Double],    [Maybe (V3 Double)], [Maybe (V3 Double)], [Material Double T.Text])
+
 -- | Extracts vertex, normal, texture and material data from a model
 -- TODO: Figure out how to deal with missing indices
-modelAttributes :: Model -> (Vertices, TexCoords, Normals, Materials)
+-- TODO: Refactor, optimise
+modelAttributes :: SimpleModel -> (SimpleVertices, SimpleTexCoords, SimpleNormals, SimpleMaterials)
 modelAttributes model = unzip4 $ concat [ map (attributesAt mat) theindices | Face { material=mat, indices=theindices } <- faces model]
   where
-    vertexAt   = (vertices model !!)          . subtract 1 --
-    normalAt   = liftM $ (normals   model !!) . subtract 1 --
-    texcoordAt = liftM $ (texcoords model !!) . subtract 1 --
-    attributesAt mat (vi, ti, ni) = (vertexAt vi, texcoordAt ti, normalAt ni, mat)
+    vertexAt   = (vertices model !!)          . fromIntegral . subtract 1 --
+    normalAt   = liftM $ (normals   model !!) . fromIntegral . subtract 1 --
+    texcoordAt = liftM $ (texcoords model !!) . fromIntegral . subtract 1 --
+    attributesAt mat (VertexIndices {ivertex, itexcoord, inormal}) = (vertexAt ivertex, texcoordAt itexcoord, normalAt inormal, mat)
     -- collect (vs, ts, ns, mats)    = (Vertices vs, TexCoords ts, Normals ns, Materials mats)
 
 
@@ -352,9 +431,11 @@ modelAttributes model = unzip4 $ concat [ map (attributesAt mat) theindices | Fa
 -- TODO: Specialise to [[Face]] (?)
 -- TODO: Check vertex count (has to be atleast three)
 -- TODO: Better names (?)
-tessellate :: Face -> Face
+tessellate :: SimpleFace -> SimpleFace
 tessellate face@(Face { indices=ind }) = face { indices=triangles ind }
-  where triangles (a:rest) = concat $ pairwise (\b c -> [a, b, c]) rest
+  where
+    triangles (a:rest) = concat $ pairwise (\b c -> [a, b, c]) rest
+    pairwise f xs = zipWith f xs (drop 1 xs)
 
 
 -- |
@@ -363,23 +444,26 @@ tessellate face@(Face { indices=ind }) = face { indices=triangles ind }
 
 -- |
 -- TODO: Deal with empty vertex lists (?)
+-- TODO: Refactor
 -- boundingbox :: (RealFloat n, Ord n) => Model -> BoundingBox (Vector3D n)
-boundingbox :: Model -> BoundingBox (Vector3D Float)
-boundingbox model = BoundingBox { centreOf=Vector3D (minx+maxx) (miny+maxy) (minz+maxz) * Vector3D 0.5 0 0, sizeOf=Vector3D (maxx-minx) (maxy-miny) (maxz-minz) }
+boundingbox :: SimpleModel -> BoundingBox (V3 Double)
+boundingbox model = BoundingBox {
+                      cornerOf = V3 minx miny minz,
+                      sizeOf   = V3 (maxx-minx) (maxy-miny) (maxz-minz) }
   where
     minmax :: (Ord o) => [o] -> (o, o)
     minmax (v:alues) = foldr (\val acc -> (min val (fst acc), max val (snd acc))) (v, v) alues              -- TODO: Factor out
 
-    [(minx, maxx), (miny, maxy), (minz, maxz)] = [ minmax . map (^.f) $ vertices model | f <- [_1, _2, _3]] -- TODO: Make sure the order is right
+    [(minx, maxx), (miny, maxy), (minz, maxz)] = [ minmax . map (^.f) $ vertices model | f <- [x, y, z]] -- TODO: Make sure the order is right
 
 -- Model queries ---------------------------------------------------------------------------------------------------------------------------
 
 -- |
-hasTextures :: Model -> Bool
-hasTextures =  not . Set.null . textures -- (/= Nothing)
+hasTextures :: Ord s => Model f s i m -> Bool
+hasTextures =  not . S.null . textures -- (/= Nothing)
 
 
 -- | All texture names as a list
 -- TODO: Wrap in ;aybe (instead of empty list) (?)
-textures :: Model -> Set.Set String
-textures = Set.fromList . catMaybes . map texture . concatMap Map.elems . Map.elems . materials
+textures :: Ord s => Model f s i m -> S.Set s
+textures = S.fromList . catMaybes . map texture . concatMap M.elems . M.elems . materials

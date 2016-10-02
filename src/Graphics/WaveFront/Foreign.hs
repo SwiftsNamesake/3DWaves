@@ -9,7 +9,7 @@
 
 -- February 24 2015
 
--- TODO | - Possible to get rid of newtypes
+-- TODO | - Possible to get rid of newtypes (?)
 --        - Decide on an API
 
 -- SPEC | -
@@ -37,7 +37,7 @@ import Foreign.Storable
 import qualified Foreign.C as C
 
 import           Graphics.WaveFront.Types
-import qualified Graphics.WaveFront.Parsers as Parsers
+import qualified Graphics.WaveFront.Parse as Parse
 
 
 
@@ -54,6 +54,30 @@ import qualified Graphics.WaveFront.Parsers as Parsers
 -- parseMTL :: C.CString -> CMTL
 -- parseMTL = CMTL . Parsers.parseMTL . unsafePerformIO . C.peekCString
 
+
+
+-- -- |
+-- newtype COBJ = COBJ OBJ
+--
+--
+-- -- |
+-- newtype CMTL = CMTL MTL
+--
+--
+-- -- | We
+-- instance Storable COBJ where
+--   sizeOf    = const 0
+--   alignment = const 0
+--   peek _    = error "Work in progress"
+--   poke _    = error "Work in progress"
+--
+--
+-- -- | We
+-- instance Storable CMTL where
+--   sizeOf    = const 0
+--   alignment = const 0
+--   peek _    = error "Work in progress"
+--   poke _    = error "Work in progress"
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------

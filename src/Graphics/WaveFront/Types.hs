@@ -21,8 +21,11 @@
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- GHC Pragmas
 --------------------------------------------------------------------------------------------------------------------------------------------
-
-
+-- {-# LANGUAGE DuplicateRecordFields #-} -- I love GHC 8.0
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE DeriveFunctor        #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------
@@ -35,8 +38,15 @@ module Graphics.WaveFront.Types where
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
-import qualified Data.Map as Map
-import Foreign.Storable
+import           Data.Functor.Classes (Eq1, Show1, showsPrec1, eq1)
+import           Data.Int (Int64)
+import qualified Data.Map  as M
+import qualified Data.Text as T
+import           Foreign.Storable
+
+
+import Linear.V2
+import Linear.V3
 
 
 
@@ -45,15 +55,17 @@ import Foreign.Storable
 --------------------------------------------------------------------------------------------------------------------------------------------
 
 -- OBJ parser types ------------------------------------------------------------------------------------------------------------------------
+
 -- | Represents a single (valid) OBJ token
 --
 -- TODO: Polymorphic numerical types (?)
 -- TODO: Add context, metadata (eg. line numbers, filename) (?)
 -- TODO: Naming scheme (added OBJ prefix to prevent name clashes; cf. Face type)
 -- TODO: Comment token (preserve comments in parser output or remove them) (?)
-data OBJToken m f s i = OBJVertex  f f f |
-                        OBJNormal  f f f |
-                        OBJTexture f f   |
+-- TODO: Rename OBJTexture (eg. to 'OBJTexCoord')
+data OBJToken f s i m = OBJVertex  (V3 f) |
+                        OBJNormal  (V3 f) |
+                        OBJTexture (V2 f) |
                         OBJFace (m (VertexIndices i)) | -- TODO: Associate material with each face, handle absent indices
 
                         UseMTL s | --
@@ -62,20 +74,21 @@ data OBJToken m f s i = OBJVertex  f f f |
                         -- TODO: Use OBJ prefix (?)
                         Group  (m s) |   -- TODO: Do grouped faces have to be consecutive?
                         Object (m s)     -- TODO: What is the difference between group and object?
-                        deriving (Eq, Show) -- TODO: Derive Read (?)
-
-type VertexIndices i = (i, Maybe i, Maybe i)
+                        -- deriving (Show, Eq) -- TODO: Derive Read (?)
 
 
 -- |
 -- TODO: Rename (?)
-data OBJNoParse s = OBJComment s | OBJEmpty | OBJNoSuchAttribute s | OBJNoParse s deriving (Show)
+data VertexIndices i = VertexIndices {
+  ivertex   :: i,
+  inormal   :: Maybe i,
+  itexcoord :: Maybe i
+} deriving (Show, Eq)
 
 
 -- |
--- TODO: Use error type instead of String, allowing us to distinguish invalid data
---       from eg. comments and blank lines (?)
-type OBJRow m f s i = (i, Either (OBJNoParse s) (OBJToken m f s i), s)
+-- TODO: Rename (?)
+data OBJNoParse s = OBJComment s | OBJEmpty | OBJNoSuchAttribute s | OBJNoParse s deriving (Show, Eq)
 
 
 -- | Output type of the OBJ parser. Currently a list-like structure of line number and token (or error string) pairs
@@ -83,7 +96,7 @@ type OBJRow m f s i = (i, Either (OBJNoParse s) (OBJToken m f s i), s)
 -- TODO: Rename (?)
 -- TODO: Use Integral for line number (?)
 --
-type OBJ m f s i = m (OBJRow m f s i)
+type OBJ f s i m = m (OBJToken f s i m)
 
 -- MTL parser types ------------------------------------------------------------------------------------------------------------------------
 
@@ -92,51 +105,34 @@ type OBJ m f s i = m (OBJRow m f s i)
 -- TODO: Is the alpha channel optional, ignored, disallowed?
 -- TODO: Include support for ('Ns', 'Ni', 'd', 'Tr', 'illum')
 --
-data MTLToken f s = Ambient  f f f (Maybe f) | -- Ka
-                    Diffuse  f f f (Maybe f) | -- Kd
-                    Specular f f f (Maybe f) | -- Ks
+data MTLToken f s = Ambient  (Colour f) | -- Ka
+                    Diffuse  (Colour f) | -- Kd
+                    Specular (Colour f) | -- Ks
 
                     MapDiffuse  s | -- map_Kd
                     NewMaterial s   -- newmtl
-                    deriving (Eq, Show)
+                    deriving (Show, Eq)
 
 
 -- |
 -- TODO: Rename (?)
-data MTLNoParse s = MTLComment s | MTLEmpty | MTLNoSuchAttribute s | MTLNoParse s deriving (Show)
-
-
--- | Output type of the single-row MTL parser.
-type MTLRow f s i = (i, Either (MTLNoParse s ) (MTLToken f s), s)
+data MTLNoParse s = MTLComment s | MTLEmpty | MTLNoSuchAttribute s | MTLNoParse s deriving (Show, Eq)
 
 
 -- | Output type of the MTL parser. Currently a list of line number and token (or error string) pairs
---
 -- TODO: Add type for processed MTL (eg. a map between names and materials)
---
-type MTL m f s i = m (MTLRow f s i) -- (line number, MTL token, comment)
+type MTL f s m = m (MTLToken f s) -- (line number, MTL token, comment)
 
 
 -- |
-type MTLTable f s = Map.Map s (Map.Map s (Material f s))
+type MTLTable f s = M.Map s (M.Map s (Material f s))
 
 -- Model -----------------------------------------------------------------------------------------------------------------------------------
 
--- |
--- data Attributes = Attributes {
-  -- vertexdata   :: Vertices
-  -- texcoorddata :: TexCoords
--- }
-
--- newtype Vertices  = Vertices  [Vector Float]
--- newtype TexCoords = TexCoords [Maybe (Point Float)]
--- newtype Normals   = Normals   [Maybe (Vector Float)]
--- newtype Materials = Materials [Material]
-
-type Vertices  m f   = m (Vector f)
-type TexCoords m f   = m (Maybe (Point  f))
-type Normals   m f   = m (Maybe (Vector f))
-type Materials m f s = m (Material f s)
+type Vertices  f m = m (V3 f)
+type TexCoords f m = m (Maybe (V2 f))
+type Normals   f m = m (Maybe (V3 f))
+type Materials f s m = m (Material f s)
 
 -- API types -------------------------------------------------------------------------------------------------------------------------------
 
@@ -145,10 +141,10 @@ type Materials m f s = m (Material f s)
 -- TOOD: Pack indices in a tuple (eg. indices :: [(Int, Int, Int)]) (?)
 -- TOOD: Use (String, String) for the names of the mtl file and material instead of Material (?)
 -- TODO: Use types so as not to confuse the indices (eg. newtype INormal, newtype ITexcoord)
-data Face m f s i = Face {
+data Face f s i m = Face {
   indices  :: m (VertexIndices i),
-  material :: Material m f s
-} deriving (Show)
+  material :: Material f s
+} --deriving (Show, Eq)
 
 
 -- |
@@ -158,7 +154,7 @@ data Colour f = Colour {
   green :: f,
   blue  :: f,
   alpha :: f
-}
+} deriving (Show, Eq, Functor)
 
 
 -- |
@@ -170,7 +166,7 @@ data Material f s = Material {
   diffuse  :: Colour f,
   specular :: Colour f,
   texture  :: Maybe s
-} deriving (Show)
+} deriving (Show, Eq)
 
 
 -- | Abstract representation of an OBJ model with associated MTL definitions.
@@ -182,37 +178,68 @@ data Material f s = Material {
 -- TODO: Reconsider the types (especially of the materials)
 -- TODO: Rename accessor functions (eg. texcoords instead of textures) (?)
 --
-data Model m f s i = Model {
-  vertices  :: m (Vector f),
-  normals   :: m (Vector f),
-  texcoords :: m (Point  f),
-  faces     :: m f,
-  materials :: MTLTable f s,         -- TODO: Type synonym (?)
-  groups    :: Map.Map (m s) (i, i), -- TODO: Type synonym
-  objects   :: Map.Map (m s) (i, i)  -- TODO: Type synonym
-} deriving (Show)
+-- data Model f s i m = Model {
+data Model f s i m = Model {
+  vertices  :: m (V3 f),
+  normals   :: m (V3 f),
+  texcoords :: m (V2 f),
+  faces     :: m (Face f s i m),
+  materials :: MTLTable f s,       -- TODO: Type synonym (?)
+  groups    :: M.Map (m s) (i, i), -- TODO: Type synonym
+  objects   :: M.Map (m s) (i, i)  -- TODO: Type synonym
+} -- deriving (Show, Eq)
 
--- Foreign ---------------------------------------------------------------------------------------------------------------------------------
+-- Monomorphic defaults --------------------------------------------------------------------------------------------------------------------
 
--- -- |
--- newtype COBJ = COBJ OBJ
---
---
--- -- |
--- newtype CMTL = CMTL MTL
---
---
--- -- | We
--- instance Storable COBJ where
---   sizeOf    = const 0
---   alignment = const 0
---   peek _    = error "Work in progress"
---   poke _    = error "Work in progress"
---
---
--- -- | We
--- instance Storable CMTL where
---   sizeOf    = const 0
---   alignment = const 0
---   peek _    = error "Work in progress"
---   poke _    = error "Work in progress"
+-- TODO: Use type families to simplify this mess
+
+-- | Synonym with sensible monomorphic defaults
+-- type Simple f = f Double T.Text Int64 []
+type SimpleOBJ      = OBJ      Double T.Text Int64 []
+type SimpleOBJToken = OBJToken Double T.Text Int64 []
+
+type SimpleVertices  = Vertices  Double        []
+type SimpleTexCoords = TexCoords Double        []
+type SimpleNormals   = Normals   Double        []
+type SimpleMaterials = Materials Double T.Text []
+
+type SimpleMTL      = MTL      Double T.Text [] 
+type SimpleMTLToken = MTLToken Double T.Text
+
+type SimpleMaterial = Material Double T.Text
+
+type SimpleMTLTable = MTLTable Double T.Text
+
+-- TODO: These two are API types (not intermediary parser types like the ones above),
+--       so they should use a list with O(1) indexing instead of []
+type SimpleFace  = Face  Double T.Text Int64 []
+type SimpleModel = Model Double T.Text Int64 []
+
+-- type DefaultFloat  = Double
+-- type DefaultString = T.Text
+-- type DefaultInt    = Int64
+-- type DefaultList   = []
+
+-- Instances -------------------------------------------------------------------------------------------------------------------------------
+
+-- TODO: Use Show1, Eq1, etc. (?)
+-- deriving instance (Show1 m) => Show1 (m a)
+-- deriving instance (Show1 m) => Show1 (m a)
+-- deriving instance (Show1 m) => Show1 (m a)
+
+-- TODO: Clean this up
+
+-- showsPrec1 :: (Show1 f, Show a) => Int -> f a -> ShowS
+deriving instance (Show1 m,
+                   Show (m f),
+                   Show (m (V2 f)),
+                   Show (m (V3 f)),
+                   Show (m (Face f s i m)),
+                   Show (m s),
+                   Show f,
+                   Show s,
+                   Show i) => Show (Model f s i m) --   where showsPrec = showsPrec1
+
+deriving instance (Show1 m, Show (m f), Show (m (VertexIndices i)),  Show (m (V3 f)), Show (m s), Show f, Show s, Show i) => Show (Face  f s i m) --   where showsPrec = _
+deriving instance (Show1 m, Show (m f), Show (m (VertexIndices i)),  Show (m (V3 f)), Show (m s), Show f, Show s, Show i) => Show (OBJToken f s i m) -- where showsPrec = _
+

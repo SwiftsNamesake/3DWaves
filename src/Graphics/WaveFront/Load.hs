@@ -36,28 +36,32 @@ module Graphics.WaveFront.Load where
 import System.FilePath (splitFileName, (</>))
 import System.IO       (hFlush, stdout)
 
-import Data.Either (rights, isLeft)
+import           Data.Either (rights, isLeft)
+import qualified Data.Text    as T
+import qualified Data.Text.IO as T
 
 import Control.Lens ((^.), _2)
+import Control.Applicative ((<$>), (<*>))
+
+import qualified Data.Attoparsec.Text as Atto
 
 import Graphics.WaveFront.Types
-import Graphics.WaveFront.Parsers   (parseOBJ, parseMTL, createMTLTable, createModel)
-import Graphics.WaveFront.Utilities
+import Graphics.WaveFront.Parse (parseOBJ, parseMTL, createMTLTable, createModel)
 
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- Functions (IO)
 --------------------------------------------------------------------------------------------------------------------------------------------
+
 -- Loading data ----------------------------------------------------------------------------------------------------------------------------
+
 -- |
 --
 -- TODO: Use bytestrings (?)
 -- TODO: Deal with IO and parsing errors
-loadOBJ :: String -> IO (OBJ m f s i)
-loadOBJ fn = do
-  rawOBJ <- readFile fn    --
-  return $ parseOBJ rawOBJ --
+loadOBJ :: String -> IO (Either String (OBJ f s i m))
+loadOBJ fn = Atto.parseOnly parseOBJ <$> T.readFile fn    --
 
 
 -- |
@@ -65,10 +69,8 @@ loadOBJ fn = do
 -- TODO: Use bytestrings (?)
 -- TODO: Merge OBJ and MTL parsers (and plug in format-specific code as needed) (?)
 -- TODO: Deal with IO and parsing errors
-loadMTL :: String -> IO MTL
-loadMTL fn = do
-  rawMTL <- readFile fn    -- Unparsed MTL data (text)
-  return $ parseMTL rawMTL --
+loadMTL :: String -> IO (Either String (MTL f s m))
+loadMTL fn = Atto.parseOnly parseMTL <$> T.readFile fn
 
 
 -- |
@@ -76,16 +78,15 @@ loadMTL fn = do
 -- TODO: Refactor, simplify
 -- TODO: Improve path handling (cf. '</>')
 -- TODO: Graceful error handling
-loadMaterials :: [String] -> IO MTLTable
-loadMaterials fns = do
-  mtls <- mapM loadMTL fns --
-  return . createMTLTable . zip (map (snd . splitFileName) fns) . map tokensOf $ mtls --
-  where tokensOf = rights . map (^._2)
+loadMaterials :: [String] -> IO (MTLTable f s)
+loadMaterials fns = createMTLTable . zip (map (snd . splitFileName) fns) . map tokensOf <$> mapM loadMTL fns --
+  where
+    tokensOf = rights . map (^._2)
 
 
 -- | Loads an OBJ model from file, including associated materials
 -- TODO: Graceful error handling
-loadModel :: String -> IO Model
+loadModel :: String -> IO (Model f s i m)
 loadModel fn = do
   obj       <- loadOBJ fn
   materials <- loadMaterials [ (fst $ splitFileName fn) </> name | LibMTL name <- rights $ map (^._2) obj ]

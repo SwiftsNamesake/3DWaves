@@ -1,15 +1,8 @@
-extra-deps:
-  - GLURaw-1.5.0.2
-  - GLUtil-0.8.7
-  - ObjectName-1.1.0.0
-  - OpenGL-2.13.1.0
-  - OpenGLRaw-2.5.5.0
-  - hpp-0.1.0.0
-resolver: lts-6.8
 flags: {}
 packages:
 - '.'
-- location:
-    git: https://github.com/SwiftsNamesake/Cartesian.git
-    commit: dff47a12ee7a514ac44c8fb7f3eae8cf84a961d0
-            
+- location: C:/Users/Jonatan/Desktop/Haskell/modules/Cartesian
+extra-deps:
+- GLUtil-0.9.1.0
+- hpp-0.3.1.0
+resolver: lts-7.0

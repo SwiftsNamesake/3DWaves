@@ -1,3 +1,7 @@
+:set -XOverloadedStrings
+
+import qualified Data.Text as T
+import qualified Data.Attoparsec.Text as Atto
 
 :set prompt  "> "
 :set prompt2 "| "
