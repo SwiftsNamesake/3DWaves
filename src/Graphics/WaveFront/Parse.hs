@@ -72,6 +72,7 @@
 module Graphics.WaveFront.Parse (
   parseOBJ, parseMTL,
   facesOf,  materialsOf,
+  comment, lineSeparator,
   modelAttributes, tessellate, boundingbox,
   hasTextures, textures,
   module Graphics.WaveFront.Types, -- TODO: Don't export internal types (duh)
@@ -232,6 +233,7 @@ word = T.pack <$> Atto.many1 Atto.letter
 parenthesised :: Atto.Parser a -> Atto.Parser a
 parenthesised p = Atto.char '(' *> p <* Atto.char ')'
 
+-- TODO: Allow scientific notation (?)
 
 -- |
 -- TODO: Polymorphic
@@ -276,6 +278,7 @@ parseMTLRow :: Atto.Parser (SimpleMTLToken)
 parseMTLRow = token <* ignore comment
     where
       -- TODO: How to deal with common prefix (Ka, Kd, Ks) (backtrack?)
+      token :: Atto.Parser (SimpleMTLToken)
       token = (Atto.string "Ka"     *> ambient)     <|>
               (Atto.string "Kd"     *> diffuse)     <|>
               (Atto.string "Ks"     *> specular)    <|>

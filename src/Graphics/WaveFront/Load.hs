@@ -34,14 +34,11 @@ module Graphics.WaveFront.Load where
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
 import System.FilePath (splitFileName, (</>))
-import System.IO       (hFlush, stdout)
 
-import           Data.Either (rights, isLeft)
 import qualified Data.Text    as T
 import qualified Data.Text.IO as T
 
-import Control.Lens ((^.), (%~), _1, _2)
-import Control.Applicative ((<$>), (<*>))
+import Control.Applicative ((<$>))
 import Control.Monad.Trans.Either
 
 import qualified Data.Attoparsec.Text as Atto

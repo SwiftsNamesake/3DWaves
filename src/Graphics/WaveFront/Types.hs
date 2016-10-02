@@ -42,8 +42,6 @@ import           Data.Functor.Classes (Show1) --Eq1, Show1, showsPrec1, eq1)
 import           Data.Int (Int64)
 import qualified Data.Map  as M
 import qualified Data.Text as T
-import           Foreign.Storable
-
 
 import Linear.V2
 import Linear.V3
