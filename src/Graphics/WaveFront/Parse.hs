@@ -88,7 +88,6 @@ import           Data.Int    (Int64)
 import           Data.List   (groupBy, unzip4)
 import           Data.Maybe  (listToMaybe, catMaybes)
 import           Data.Either (rights)
-import           Data.Char   (isSpace)
 import qualified Data.Map  as M
 import qualified Data.Set  as S
 import qualified Data.Text as T
@@ -97,7 +96,7 @@ import qualified Data.Attoparsec.Text       as Atto
 import qualified Data.Attoparsec.Combinator as Atto
 
 import Control.Monad       (liftM)
-import Control.Lens ((^.), _1, _2, _3)
+import Control.Lens ((^.), _3)
 import Control.Applicative (pure, liftA2, (<$>), (<*>), (<*), (*>), (<|>))
 
 import Linear.V2 (V2(..))
@@ -177,6 +176,7 @@ parseOBJRow = token <* ignore comment -- TODO: Let the separator handle comments
 
     -- A single vertex definition with indices for vertex position, normal, and texture coordinates
     -- TODO: Should the slashes be optional?
+    ivertex :: Atto.Parser (VertexIndices Int64)
     ivertex = VertexIndices <$>
                 (Atto.decimal          <* Atto.char '/') <*>
                 (optional Atto.decimal <* Atto.char '/') <*>
@@ -381,8 +381,9 @@ materialsOf tokens = M.fromList . rights $ map createMaterial thegroups
 -- TODO: Refactor, simplify
 createMTLTable :: [(T.Text, [SimpleMTLToken])] -> SimpleMTLTable
 createMTLTable mtls = M.fromList . map (\ (name, tokens) -> (name, M.mapMaybe prune . materialsOf $ tokens)) $ mtls
-  where prune (Right mat) = Just mat
-        prune (Left  _)   = Nothing
+  where
+    prune (Right mat) = Just mat
+    prune (Left  _)   = Nothing
 
 -- API functions ---------------------------------------------------------------------------------------------------------------------------
 

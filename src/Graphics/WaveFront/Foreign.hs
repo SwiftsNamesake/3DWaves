@@ -33,7 +33,7 @@ module Graphics.WaveFront.Foreign where
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
 import System.IO.Unsafe (unsafePerformIO)
-import Foreign.Storable
+-- import Foreign.Storable
 import qualified Foreign.C as C
 
 import           Graphics.WaveFront.Types

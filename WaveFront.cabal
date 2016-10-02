@@ -54,12 +54,25 @@ library
   -- Modules included in this library but not exported.
   -- other-modules:
 
+  -- Compiler arguments
+  ghc-options:         -fwarn-tabs
+                       -fwarn-unused-imports
+                       -- -fwarn-name-shadowing
+                       -fwarn-incomplete-uni-patterns
+                       -fwarn-incomplete-patterns
+                       -fwarn-overlapping-patterns
+                       -fwarn-incomplete-record-updates
+                       -fwarn-missing-signatures
+                       -fwarn-monomorphism-restriction
+                       -fwarn-orphans
+
   -- LANGUAGE extensions used by modules in this package.
   other-extensions:    UnicodeSyntax, TupleSections, ForeignFunctionInterface
 
   -- Other library packages from which modules are imported.
   build-depends:         base == 4.*
                        , lens <= 4.14
+                       , either
                        , OpenGL
                        , GLUtil
                        , linear

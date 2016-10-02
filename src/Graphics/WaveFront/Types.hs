@@ -38,7 +38,7 @@ module Graphics.WaveFront.Types where
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
-import           Data.Functor.Classes (Eq1, Show1, showsPrec1, eq1)
+import           Data.Functor.Classes (Show1) --Eq1, Show1, showsPrec1, eq1)
 import           Data.Int (Int64)
 import qualified Data.Map  as M
 import qualified Data.Text as T
