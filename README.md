@@ -22,8 +22,10 @@ See source files (.hs) for additional items.
 
 - [ ] Use [Attoparsec](https://hackage.haskell.org/package/attoparsec) instead (branch off) (?)
 - [ ] Performance (currently, it's atrocious)
+      -- Parallelism
 - [ ] Add sample models and demos
 - [ ] Add profiling and checks (cf. QuickCheck)
 - [ ] GHCi support
 - [ ] Proper ticket system
 - [ ] Polymorphism
+- [ ] Serialising (eg. writing to OBJ and MTL)

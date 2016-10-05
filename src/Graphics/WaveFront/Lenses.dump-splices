@@ -1,0 +1,194 @@
+C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\src\Graphics\WaveFront\Lenses.hs:50:1-48: Splicing declarations
+    makeLensesWith abbreviatedFields ''VertexIndices
+  ======>
+    class HasInormal s a | s -> a where
+      inormal :: Control.Lens.Type.Lens' s a
+    instance HasInormal (VertexIndices i_aDYl) (Maybe i_aDYl) where
+      {-# INLINE inormal #-}
+      inormal f_aESm (VertexIndices x1_aESn x2_aESo x3_aESp)
+        = fmap
+            (\ y1_aESq -> VertexIndices x1_aESn y1_aESq x3_aESp)
+            (f_aESm x2_aESo)
+    class HasItexcoord s a | s -> a where
+      itexcoord :: Control.Lens.Type.Lens' s a
+    instance HasItexcoord (VertexIndices i_aDYl) (Maybe i_aDYl) where
+      {-# INLINE itexcoord #-}
+      itexcoord f_aESr (VertexIndices x1_aESs x2_aESt x3_aESu)
+        = fmap
+            (\ y1_aESv -> VertexIndices x1_aESs x2_aESt y1_aESv)
+            (f_aESr x3_aESu)
+    class HasIvertex s a | s -> a where
+      ivertex :: Control.Lens.Type.Lens' s a
+    instance HasIvertex (VertexIndices i_aDYl) i_aDYl where
+      {-# INLINE ivertex #-}
+      ivertex f_aESw (VertexIndices x1_aESx x2_aESy x3_aESz)
+        = fmap
+            (\ y1_aESA -> VertexIndices y1_aESA x2_aESy x3_aESz)
+            (f_aESw x1_aESx)
+C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\src\Graphics\WaveFront\Lenses.hs:51:1-39: Splicing declarations
+    makeLensesWith abbreviatedFields ''Face
+  ======>
+    class HasIndices s a | s -> a where
+      indices :: Control.Lens.Type.Lens' s a
+    instance HasIndices (Face f_aDXV s_aDXW i_aDXX m_aDXY) (m_aDXY (VertexIndices i_aDXX)) where
+      {-# INLINE indices #-}
+      indices f_aEV3 (Face x1_aEV4 x2_aEV5)
+        = fmap (\ y1_aEV6 -> Face y1_aEV6 x2_aEV5) (f_aEV3 x1_aEV4)
+    class HasMaterial s a | s -> a where
+      material :: Control.Lens.Type.Lens' s a
+    instance HasMaterial (Face f_aDXV s_aDXW i_aDXX m_aDXY) (Material f_aDXV s_aDXW) where
+      {-# INLINE material #-}
+      material f_aEV7 (Face x1_aEV8 x2_aEV9)
+        = fmap (\ y1_aEVa -> Face x1_aEV8 y1_aEVa) (f_aEV7 x2_aEV9)
+C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\src\Graphics\WaveFront\Lenses.hs:52:1-41: Splicing declarations
+    makeLensesWith abbreviatedFields ''Colour
+  ======>
+    class HasAlpha s a | s -> a where
+      alpha :: Control.Lens.Type.Lens' s a
+    instance HasAlpha (Colour f_aDXU) f_aDXU where
+      {-# INLINE alpha #-}
+      alpha f_aEXc (Colour x1_aEXd x2_aEXe x3_aEXf x4_aEXg)
+        = fmap
+            (\ y1_aEXh -> Colour x1_aEXd x2_aEXe x3_aEXf y1_aEXh)
+            (f_aEXc x4_aEXg)
+    class HasBlue s a | s -> a where
+      blue :: Control.Lens.Type.Lens' s a
+    instance HasBlue (Colour f_aDXU) f_aDXU where
+      {-# INLINE blue #-}
+      blue f_aEXi (Colour x1_aEXj x2_aEXk x3_aEXl x4_aEXm)
+        = fmap
+            (\ y1_aEXn -> Colour x1_aEXj x2_aEXk y1_aEXn x4_aEXm)
+            (f_aEXi x3_aEXl)
+    class HasGreen s a | s -> a where
+      green :: Control.Lens.Type.Lens' s a
+    instance HasGreen (Colour f_aDXU) f_aDXU where
+      {-# INLINE green #-}
+      green f_aEXo (Colour x1_aEXp x2_aEXq x3_aEXr x4_aEXs)
+        = fmap
+            (\ y1_aEXt -> Colour x1_aEXp y1_aEXt x3_aEXr x4_aEXs)
+            (f_aEXo x2_aEXq)
+    class HasRed s a | s -> a where
+      red :: Control.Lens.Type.Lens' s a
+    instance HasRed (Colour f_aDXU) f_aDXU where
+      {-# INLINE red #-}
+      red f_aEXu (Colour x1_aEXv x2_aEXw x3_aEXx x4_aEXy)
+        = fmap
+            (\ y1_aEXz -> Colour y1_aEXz x2_aEXw x3_aEXx x4_aEXy)
+            (f_aEXu x1_aEXv)
+C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\src\Graphics\WaveFront\Lenses.hs:53:1-43: Splicing declarations
+    makeLensesWith abbreviatedFields ''Material
+  ======>
+    class HasAmbient s a | s -> a where
+      ambient :: Control.Lens.Type.Lens' s a
+    instance HasAmbient (Material f_aDXS s_aDXT) (Colour f_aDXS) where
+      {-# INLINE ambient #-}
+      ambient f_aF0K (Material x1_aF0L x2_aF0M x3_aF0N x4_aF0O)
+        = fmap
+            (\ y1_aF0P -> Material y1_aF0P x2_aF0M x3_aF0N x4_aF0O)
+            (f_aF0K x1_aF0L)
+    class HasDiffuse s a | s -> a where
+      diffuse :: Control.Lens.Type.Lens' s a
+    instance HasDiffuse (Material f_aDXS s_aDXT) (Colour f_aDXS) where
+      {-# INLINE diffuse #-}
+      diffuse f_aF0Q (Material x1_aF0R x2_aF0S x3_aF0T x4_aF0U)
+        = fmap
+            (\ y1_aF0V -> Material x1_aF0R y1_aF0V x3_aF0T x4_aF0U)
+            (f_aF0Q x2_aF0S)
+    class HasSpecular s a | s -> a where
+      specular :: Control.Lens.Type.Lens' s a
+    instance HasSpecular (Material f_aDXS s_aDXT) (Colour f_aDXS) where
+      {-# INLINE specular #-}
+      specular f_aF0W (Material x1_aF0X x2_aF0Y x3_aF0Z x4_aF10)
+        = fmap
+            (\ y1_aF11 -> Material x1_aF0X x2_aF0Y y1_aF11 x4_aF10)
+            (f_aF0W x3_aF0Z)
+    class HasTexture s a | s -> a where
+      texture :: Control.Lens.Type.Lens' s a
+    instance HasTexture (Material f_aDXS s_aDXT) (Maybe s_aDXT) where
+      {-# INLINE texture #-}
+      texture f_aF12 (Material x1_aF13 x2_aF14 x3_aF15 x4_aF16)
+        = fmap
+            (\ y1_aF17 -> Material x1_aF13 x2_aF14 x3_aF15 y1_aF17)
+            (f_aF12 x4_aF16)
+C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\src\Graphics\WaveFront\Lenses.hs:54:1-40: Splicing declarations
+    makeLensesWith abbreviatedFields ''Model
+  ======>
+    class HasFaces s a | s -> a where
+      faces :: Control.Lens.Type.Lens' s a
+    instance HasFaces (Model f_aDXO s_aDXP i_aDXQ m_aDXR) (m_aDXR (Face f_aDXO s_aDXP i_aDXQ m_aDXR)) where
+      {-# INLINE faces #-}
+      faces
+        f_aF4x
+        (Model x1_aF4y x2_aF4z x3_aF4A x4_aF4B x5_aF4C x6_aF4D x7_aF4E)
+        = fmap
+            (\ y1_aF4F
+               -> Model x1_aF4y x2_aF4z x3_aF4A y1_aF4F x5_aF4C x6_aF4D x7_aF4E)
+            (f_aF4x x4_aF4B)
+    class HasGroups s a | s -> a where
+      groups :: Control.Lens.Type.Lens' s a
+    instance HasGroups (Model f_aDXO s_aDXP i_aDXQ m_aDXR) (containers-0.5.7.1:Data.Map.Base.Map (containers-0.5.7.1:Data.Set.Base.Set s_aDXP) (i_aDXQ,
+                                                                                                                                                i_aDXQ)) where
+      {-# INLINE groups #-}
+      groups
+        f_aF4G
+        (Model x1_aF4H x2_aF4I x3_aF4J x4_aF4K x5_aF4L x6_aF4M x7_aF4N)
+        = fmap
+            (\ y1_aF4O
+               -> Model x1_aF4H x2_aF4I x3_aF4J x4_aF4K x5_aF4L y1_aF4O x7_aF4N)
+            (f_aF4G x6_aF4M)
+    class HasMaterials s a | s -> a where
+      materials :: Control.Lens.Type.Lens' s a
+    instance HasMaterials (Model f_aDXO s_aDXP i_aDXQ m_aDXR) (MTLTable f_aDXO s_aDXP) where
+      {-# INLINE materials #-}
+      materials
+        f_aF4P
+        (Model x1_aF4Q x2_aF4R x3_aF4S x4_aF4T x5_aF4U x6_aF4V x7_aF4W)
+        = fmap
+            (\ y1_aF4X
+               -> Model x1_aF4Q x2_aF4R x3_aF4S x4_aF4T y1_aF4X x6_aF4V x7_aF4W)
+            (f_aF4P x5_aF4U)
+    class HasNormals s a | s -> a where
+      normals :: Control.Lens.Type.Lens' s a
+    instance HasNormals (Model f_aDXO s_aDXP i_aDXQ m_aDXR) (m_aDXR (Linear.V3.V3 f_aDXO)) where
+      {-# INLINE normals #-}
+      normals
+        f_aF4Y
+        (Model x1_aF4Z x2_aF50 x3_aF51 x4_aF52 x5_aF53 x6_aF54 x7_aF55)
+        = fmap
+            (\ y1_aF56
+               -> Model x1_aF4Z y1_aF56 x3_aF51 x4_aF52 x5_aF53 x6_aF54 x7_aF55)
+            (f_aF4Y x2_aF50)
+    class HasObjects s a | s -> a where
+      objects :: Control.Lens.Type.Lens' s a
+    instance HasObjects (Model f_aDXO s_aDXP i_aDXQ m_aDXR) (containers-0.5.7.1:Data.Map.Base.Map (containers-0.5.7.1:Data.Set.Base.Set s_aDXP) (i_aDXQ,
+                                                                                                                                                 i_aDXQ)) where
+      {-# INLINE objects #-}
+      objects
+        f_aF57
+        (Model x1_aF58 x2_aF59 x3_aF5a x4_aF5b x5_aF5c x6_aF5d x7_aF5e)
+        = fmap
+            (\ y1_aF5f
+               -> Model x1_aF58 x2_aF59 x3_aF5a x4_aF5b x5_aF5c x6_aF5d y1_aF5f)
+            (f_aF57 x7_aF5e)
+    class HasTexcoords s a | s -> a where
+      texcoords :: Control.Lens.Type.Lens' s a
+    instance HasTexcoords (Model f_aDXO s_aDXP i_aDXQ m_aDXR) (m_aDXR (Linear.V2.V2 f_aDXO)) where
+      {-# INLINE texcoords #-}
+      texcoords
+        f_aF5g
+        (Model x1_aF5h x2_aF5i x3_aF5j x4_aF5k x5_aF5l x6_aF5m x7_aF5n)
+        = fmap
+            (\ y1_aF5o
+               -> Model x1_aF5h x2_aF5i y1_aF5o x4_aF5k x5_aF5l x6_aF5m x7_aF5n)
+            (f_aF5g x3_aF5j)
+    class HasVertices s a | s -> a where
+      vertices :: Control.Lens.Type.Lens' s a
+    instance HasVertices (Model f_aDXO s_aDXP i_aDXQ m_aDXR) (m_aDXR (Linear.V3.V3 f_aDXO)) where
+      {-# INLINE vertices #-}
+      vertices
+        f_aF5p
+        (Model x1_aF5q x2_aF5r x3_aF5s x4_aF5t x5_aF5u x6_aF5v x7_aF5w)
+        = fmap
+            (\ y1_aF5x
+               -> Model y1_aF5x x2_aF5r x3_aF5s x4_aF5t x5_aF5u x6_aF5v x7_aF5w)
+            (f_aF5p x1_aF5q)

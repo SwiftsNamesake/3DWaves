@@ -21,7 +21,10 @@
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- GHC Pragmas
 --------------------------------------------------------------------------------------------------------------------------------------------
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances      #-}
 
 
 
@@ -35,7 +38,7 @@ module Graphics.WaveFront.Lenses where
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
-import Control.Lens (makeLenses, makeFields)
+import Control.Lens (makeLenses, makeFields, makeLensesWith, abbreviatedFields)
 
 import Graphics.WaveFront.Types
 
@@ -44,4 +47,8 @@ import Graphics.WaveFront.Types
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- Lenses
 --------------------------------------------------------------------------------------------------------------------------------------------
-
+makeLensesWith abbreviatedFields ''VertexIndices
+makeLensesWith abbreviatedFields ''Face
+makeLensesWith abbreviatedFields ''Colour
+makeLensesWith abbreviatedFields ''Material
+makeLensesWith abbreviatedFields ''Model

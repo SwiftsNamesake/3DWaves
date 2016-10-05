@@ -2,7 +2,14 @@ flags: {}
 packages:
 - '.'
 - location: C:/Users/Jonatan/Desktop/Haskell/modules/Cartesian
+- location: C:/Users/Jonatan/Desktop/Haskell/modules/Michelangelo
+- location: C:/Users/Jonatan/Desktop/Haskell/modules/Leibniz
+- location: C:/Users/Jonatan/Desktop/Haskell/modules/Interactive
 extra-deps:
 - GLUtil-0.9.1.0
 - hpp-0.3.1.0
+- ALUT-2.4.0.2
+- FTGL-2.1
+- storable-tuple-0.0.3.2
+- OpenAL-1.7.0.4
 resolver: lts-7.0

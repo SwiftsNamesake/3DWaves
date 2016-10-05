@@ -21,11 +21,13 @@
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- GHC Pragmas
 --------------------------------------------------------------------------------------------------------------------------------------------
--- {-# LANGUAGE DuplicateRecordFields #-} -- I love GHC 8.0
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE StandaloneDeriving   #-}
-{-# LANGUAGE DeriveFunctor        #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DuplicateRecordFields #-} -- I love GHC 8.0
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE DeriveFunctor         #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE DeriveFoldable        #-}
+
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------
@@ -39,9 +41,11 @@ module Graphics.WaveFront.Types where
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
 import           Data.Functor.Classes (Show1) --Eq1, Show1, showsPrec1, eq1)
-import           Data.Int (Int64)
+import           Data.Int             (Int64)
 import qualified Data.Map  as M
+import qualified Data.Set  as S
 import qualified Data.Text as T
+import qualified Data.Vector as V
 
 import Linear.V2
 import Linear.V3
@@ -70,17 +74,18 @@ data OBJToken f s i m = OBJVertex  (V3 f) |
                         LibMTL s | -- TODO: Use actual MTL type
 
                         -- TODO: Use OBJ prefix (?)
-                        Group  (m s) |   -- TODO: Do grouped faces have to be consecutive?
-                        Object (m s)     -- TODO: What is the difference between group and object?
+                        Group  (S.Set s) |   -- TODO: Do grouped faces have to be consecutive?
+                        Object (S.Set s)     -- TODO: What is the difference between group and object?
                         -- deriving (Show, Eq) -- TODO: Derive Read (?)
 
 
 -- |
 -- TODO: Rename (?)
+-- TODO: Use union instead of Maybe (?)
 data VertexIndices i = VertexIndices {
-  ivertex   :: i,
-  inormal   :: Maybe i,
-  itexcoord :: Maybe i
+  fIvertex   :: i,
+  fInormal   :: Maybe i,
+  fItexcoord :: Maybe i
 } deriving (Show, Eq)
 
 
@@ -140,19 +145,19 @@ type Materials f s m = m (Material f s)
 -- TOOD: Use (String, String) for the names of the mtl file and material instead of Material (?)
 -- TODO: Use types so as not to confuse the indices (eg. newtype INormal, newtype ITexcoord)
 data Face f s i m = Face {
-  indices  :: m (VertexIndices i),
-  material :: Material f s
+  fIndices  :: m (VertexIndices i),
+  fMaterial :: Material f s
 } --deriving (Show, Eq)
 
 
 -- |
 -- TODO: Use a type from the colour package instead (?)
 data Colour f = Colour {
-  red   :: f,
-  green :: f,
-  blue  :: f,
-  alpha :: f
-} deriving (Show, Eq, Functor)
+  fRed   :: f,
+  fGreen :: f,
+  fBlue  :: f,
+  fAlpha :: f
+} deriving (Show, Eq, Functor, Foldable)
 
 
 -- |
@@ -160,10 +165,10 @@ data Colour f = Colour {
 -- TODO: Support more attributes (entire spec) (?)
 -- TODO: Lenses (?)
 data Material f s = Material {
-  ambient  :: Colour f,
-  diffuse  :: Colour f,
-  specular :: Colour f,
-  texture  :: Maybe s
+  fAmbient  :: Colour f,
+  fDiffuse  :: Colour f,
+  fSpecular :: Colour f,
+  fTexture  :: Maybe s
 } deriving (Show, Eq)
 
 
@@ -178,18 +183,18 @@ data Material f s = Material {
 --
 -- data Model f s i m = Model {
 data Model f s i m = Model {
-  vertices  :: m (V3 f),
-  normals   :: m (V3 f),
-  texcoords :: m (V2 f),
-  faces     :: m (Face f s i m),
-  materials :: MTLTable f s,       -- TODO: Type synonym (?)
-  groups    :: M.Map (m s) (i, i), -- TODO: Type synonym
-  objects   :: M.Map (m s) (i, i)  -- TODO: Type synonym
+  fVertices  :: m (V3 f),
+  fNormals   :: m (V3 f),
+  fTexcoords :: m (V2 f),
+  fFaces     :: m (Face f s i m),
+  fMaterials :: MTLTable f s,       -- TODO: Type synonym (?)
+  fGroups    :: M.Map (S.Set s) (i, i), -- TODO: Type synonym
+  fObjects   :: M.Map (S.Set s) (i, i)  -- TODO: Type synonym
 } -- deriving (Show, Eq)
 
 -- Monomorphic defaults --------------------------------------------------------------------------------------------------------------------
 
--- TODO: Use type families to simplify this mess
+-- TODO: Use type families (or GADTs) to simplify this mess
 
 -- | Synonym with sensible monomorphic defaults
 -- type Simple f = f Double T.Text Int64 []
@@ -211,7 +216,7 @@ type SimpleMTLTable = MTLTable Double T.Text
 -- TODO: These two are API types (not intermediary parser types like the ones above),
 --       so they should use a list with O(1) indexing instead of []
 type SimpleFace  = Face  Double T.Text Int64 []
-type SimpleModel = Model Double T.Text Int64 []
+type SimpleModel = Model Double T.Text Int64 V.Vector
 
 -- type DefaultFloat  = Double
 -- type DefaultString = T.Text
@@ -238,6 +243,20 @@ deriving instance (Show1 m,
                    Show s,
                    Show i) => Show (Model f s i m) --   where showsPrec = showsPrec1
 
-deriving instance (Show1 m, Show (m f), Show (m (VertexIndices i)),  Show (m (V3 f)), Show (m s), Show f, Show s, Show i) => Show (Face  f s i m) --   where showsPrec = _
-deriving instance (Show1 m, Show (m f), Show (m (VertexIndices i)),  Show (m (V3 f)), Show (m s), Show f, Show s, Show i) => Show (OBJToken f s i m) -- where showsPrec = _
+deriving instance (Show1 m,
+                   Show (m f),
+                   Show (m (VertexIndices i)),
+                   Show (m (V3 f)),
+                   Show (m s),
+                   Show f,
+                   Show s,
+                   Show i) => Show (Face  f s i m) --   where showsPrec = _
 
+deriving instance (Show1 m,
+                   Show (m f),
+                   Show (m (VertexIndices i)), 
+                   Show (m (V3 f)),
+                   Show (m s),
+                   Show f,
+                   Show s,
+                   Show i) => Show (OBJToken f s i m) -- where showsPrec = _

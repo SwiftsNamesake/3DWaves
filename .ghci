@@ -1,7 +1,14 @@
 :set -XOverloadedStrings
+:set -XMultiParamTypeClasses
+:set -XFunctionalDependencies
+:set -XFlexibleInstances
+:set -XDuplicateRecordFields
+:set -XNamedFieldPuns
 
 import qualified Data.Text as T
 import qualified Data.Attoparsec.Text as Atto
+
+import Control.Lens as L
 
 :set prompt  "> "
 :set prompt2 "| "

@@ -43,8 +43,9 @@ import Control.Monad.Trans.Either
 
 import qualified Data.Attoparsec.Text as Atto
 
-import Graphics.WaveFront.Types
-import Graphics.WaveFront.Parse (parseOBJ, parseMTL, createMTLTable, createModel)
+import           Graphics.WaveFront.Types
+import qualified Graphics.WaveFront.Parse as Parse
+import           Graphics.WaveFront.Model (createMTLTable, createModel)
 
 
 
@@ -58,8 +59,8 @@ import Graphics.WaveFront.Parse (parseOBJ, parseMTL, createMTLTable, createModel
 --
 -- TODO: Use bytestrings (?)
 -- TODO: Deal with IO and parsing errors
-loadOBJ :: String -> IO (Either String (SimpleOBJ))
-loadOBJ fn = Atto.parseOnly parseOBJ <$> T.readFile fn    --
+obj :: String -> IO (Either String (SimpleOBJ))
+obj fn = Atto.parseOnly Parse.obj <$> T.readFile fn    --
 
 
 -- |
@@ -67,8 +68,8 @@ loadOBJ fn = Atto.parseOnly parseOBJ <$> T.readFile fn    --
 -- TODO: Use bytestrings (?)
 -- TODO: Merge OBJ and MTL parsers (and plug in format-specific code as needed) (?)
 -- TODO: Deal with IO and parsing errors
-loadMTL :: String -> IO (Either String (SimpleMTL))
-loadMTL fn = Atto.parseOnly parseMTL <$> T.readFile fn
+mtl :: String -> IO (Either String (SimpleMTL))
+mtl fn = Atto.parseOnly Parse.mtl <$> T.readFile fn
 
 
 -- |
@@ -76,17 +77,17 @@ loadMTL fn = Atto.parseOnly parseMTL <$> T.readFile fn
 -- TODO: Refactor, simplify
 -- TODO: Improve path handling (cf. '</>')
 -- TODO: Graceful error handling
-loadMaterials :: [String] -> IO (Either String (SimpleMTLTable))
-loadMaterials fns = runEitherT $ createTableFromMTLs <$> mapM (EitherT . loadMTL) fns --
+materials :: [String] -> IO (Either String (SimpleMTLTable))
+materials fns = runEitherT $ createTableFromMTLs <$> mapM (EitherT . mtl) fns --
   where
     createTableFromMTLs = createMTLTable . zip (map (T.pack . snd . splitFileName) fns)
 
 
 -- | Loads an OBJ model from file, including associated materials
 -- TODO: Graceful error handling
-loadModel :: String -> IO (Either String (SimpleModel))
-loadModel fn = runEitherT $ do
-  obj       <- EitherT $ loadOBJ fn
-  materials <- EitherT $ loadMaterials [ fst (splitFileName fn) </> T.unpack name | LibMTL name <- obj ]
+model :: String -> IO (Either String (SimpleModel))
+model fn = runEitherT $ do
+  obj       <- EitherT $ obj fn
+  materials <- EitherT $ materials [ fst (splitFileName fn) </> T.unpack name | LibMTL name <- obj ]
   return $ createModel obj materials
-  -- where loadWithName name = loadMTL name >>= return . (name,)
+  -- where loadWithName name = mtl name >>= return . (name,)
