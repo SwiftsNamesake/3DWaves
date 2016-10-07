@@ -20,8 +20,6 @@ Jonatan H Sundqvist
 
 See source files (.hs) for additional items.
 
-- [ ] ~~ Use [Attoparsec](https://hackage.haskell.org/package/attoparsec) instead (branch off)~~
-      -- There is still an attoparsec branch, but I'll probably merge the attoparsec branch instead (it should be faster)
 - [ ] Performance (currently, it's atrocious) (...)
       -- Parallelism (...)
 - [ ] Add sample models and demos (...)
