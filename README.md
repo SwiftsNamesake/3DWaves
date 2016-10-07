@@ -20,15 +20,18 @@ Jonatan H Sundqvist
 
 See source files (.hs) for additional items.
 
-- [ ] Use [Attoparsec](https://hackage.haskell.org/package/attoparsec) instead (branch off) (?)
-- [ ] Performance (currently, it's atrocious)
-      -- Parallelism
-- [ ] Add sample models and demos
+- [-] Use [Attoparsec](https://hackage.haskell.org/package/attoparsec) instead (branch off)
+      -- There is still an attoparsec branch, but I'll probably merge the attoparsec branch instead (it should be faster)
+- [ ] Performance (currently, it's atrocious) (...)
+      -- Parallelism (...)
+- [ ] Add sample models and demos (...)
 - [ ] Add profiling and checks (cf. QuickCheck)
-- [ ] GHCi support
-- [ ] Proper ticket system
-- [ ] Polymorphism
+- [x] GHCi support (added .ghci file, works quite well)
+- [x] Proper ticket system ([here](https://github.com/SwiftsNamesake/3DWaves/issues/))
+- [ ] Polymorphism (...)
 - [ ] Serialising (eg. writing to OBJ and MTL)
+- [ ] Rendering
+      -- Create a separate package (wavefront-render) with an OpenGL backend
 - [ ] Executables
-      - OBJ viewer (?)
+      - OBJ viewer (...)
       - Command line tool (?)
