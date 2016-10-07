@@ -21,7 +21,7 @@ Jonatan H Sundqvist
 See source files (.hs) for additional items.
 
 - [ ] Performance (currently, it's atrocious) (...)
-      -- Parallelism (...)
+      - Parallelism (...)
 - [ ] Add sample models and demos (...)
 - [ ] Add profiling and checks (cf. QuickCheck)
 - [x] GHCi support (added .ghci file, works quite well)
@@ -29,7 +29,7 @@ See source files (.hs) for additional items.
 - [ ] Polymorphism (...)
 - [ ] Serialising (eg. writing to OBJ and MTL)
 - [ ] Rendering
-      -- Create a separate package (wavefront-render) with an OpenGL backend
+      - Create a separate package (wavefront-render) with an OpenGL backend
 - [ ] Executables
       - OBJ viewer (...)
       - Command line tool (?)
