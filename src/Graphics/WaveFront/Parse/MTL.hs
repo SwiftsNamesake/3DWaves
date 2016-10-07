@@ -63,7 +63,7 @@ import Graphics.WaveFront.Types hiding (ambient, diffuse, specular)
 
 -- | Produces a list of MTL tokens, with associated line numbers and comments
 mtl :: Atto.Parser (SimpleMTL)
-mtl = Atto.sepBy row lineSeparator -- <* Atto.endOfInput
+mtl = cutToTheChase *> Atto.sepBy row lineSeparator -- <* Atto.endOfInput
 
 
 -- | Parses a single MTL row.
@@ -78,7 +78,12 @@ token :: Atto.Parser (SimpleMTLToken)
 token = (Atto.string "Ka"     *> ambient)     <|>
         (Atto.string "Kd"     *> diffuse)     <|>
         (Atto.string "Ks"     *> specular)    <|>
+        (Atto.string "Ns"     *> specExp)     <|>
+        (Atto.string "illum"  *> illum)       <|>
+        (Atto.string "Ni"     *> refraction)  <|>
+        (Atto.string "d"      *> dissolve)    <|> -- TODO: Handle inverse as well (cf. 'Tr' attribute)
         (Atto.string "map_Kd" *> mapDiffuse)  <|>
+        (Atto.string "map_Ka" *> mapAmbient)  <|>
         (Atto.string "newmtl" *> newMaterial)
 
 --------------------------------------------------------------------------------------------------------------------------------------------
@@ -87,24 +92,49 @@ token = (Atto.string "Ka"     *> ambient)     <|>
 
 -- |
 ambient :: Atto.Parser (SimpleMTLToken)
-ambient = space *> (Ambient  <$> colour)
+ambient = Ambient <$> colour
 
 
 -- |
 diffuse :: Atto.Parser (SimpleMTLToken)
-diffuse = space *> (Diffuse  <$> colour)
+diffuse = Diffuse <$> colour
 
 
 -- |
 specular :: Atto.Parser (SimpleMTLToken)
-specular = space *> (Specular <$> colour)
+specular = Specular <$> colour
+
+
+-- |
+specExp :: Atto.Parser (SimpleMTLToken)
+specExp = space *> (SpecularExponent <$> Atto.rational)
+
+
+-- |
+illum :: Atto.Parser (SimpleMTLToken)
+illum = space *> (Illum <$> clamped 0 10)
+
+
+-- |
+refraction :: Atto.Parser (SimpleMTLToken)
+refraction = space *> (Refraction <$> Atto.rational)
+
+
+-- |
+dissolve :: Atto.Parser (SimpleMTLToken)
+dissolve = space *> (Dissolve <$> Atto.rational)
 
 
 -- |
 mapDiffuse :: Atto.Parser (SimpleMTLToken)
-mapDiffuse = space *> (MapDiffuse  <$> word)
+mapDiffuse = space *> (MapDiffuse  <$> name)
+
+
+-- |
+mapAmbient :: Atto.Parser (SimpleMTLToken)
+mapAmbient = space *> (MapAmbient  <$> name)
 
 
 -- |
 newMaterial :: Atto.Parser (SimpleMTLToken)
-newMaterial = space *> (NewMaterial <$> word)
+newMaterial = space *> (NewMaterial <$> name)

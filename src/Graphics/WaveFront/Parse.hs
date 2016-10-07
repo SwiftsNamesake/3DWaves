@@ -42,7 +42,7 @@
 --          -- Do the usemtl and libmtl statements affect vertices or faces (?)
 --
 --        - Parser bugs
---          -- Negative coordinates enclosed in parentheses (...)
+--          -- Negative coordinates enclosed in parentheses (✓)
 --
 --        - Decide on a public interface (exports) (API)
 --          -- Model will be the main API type

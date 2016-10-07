@@ -65,13 +65,21 @@ import Linear.V3
 -- TODO: Naming scheme (added OBJ prefix to prevent name clashes; cf. Face type)
 -- TODO: Comment token (preserve comments in parser output or remove them) (?)
 -- TODO: Rename OBJTexture (eg. to 'OBJTexCoord')
+--
+-- TODO: Cover the entire spec (http://www.martinreddy.net/gfx/3d/OBJ.spec)
+--       (and handle unimplemented attributes gracefully)
 data OBJToken f s i m = OBJVertex  (V3 f) |
                         OBJNormal  (V3 f) |
                         OBJTexture (V2 f) |
                         OBJFace (m (VertexIndices i)) | -- TODO: Associate material with each face, handle absent indices
 
+                        Line i i | -- Line (I'm assuming the arguments are indices to the endpoint vertices)
+
                         UseMTL s | --
                         LibMTL s | -- TODO: Use actual MTL type
+
+                        SmoothShading Bool | -- s
+
 
                         -- TODO: Use OBJ prefix (?)
                         Group  (S.Set s) |   -- TODO: Do grouped faces have to be consecutive?
@@ -84,8 +92,8 @@ data OBJToken f s i m = OBJVertex  (V3 f) |
 -- TODO: Use union instead of Maybe (?)
 data VertexIndices i = VertexIndices {
   fIvertex   :: i,
-  fInormal   :: Maybe i,
-  fItexcoord :: Maybe i
+  fItexcoord :: Maybe i,
+  fInormal   :: Maybe i
 } deriving (Show, Eq)
 
 
@@ -107,14 +115,37 @@ type OBJ f s i m = m (OBJToken f s i m)
 --
 -- TODO: Is the alpha channel optional, ignored, disallowed?
 -- TODO: Include support for ('Ns', 'Ni', 'd', 'Tr', 'illum')
---
+-- TODO: Assume no colours have an alpha channel, since transparency is handled by the 'd' attribute (?)
 data MTLToken f s = Ambient  (Colour f) | -- Ka
                     Diffuse  (Colour f) | -- Kd
                     Specular (Colour f) | -- Ks
 
+                    SpecularExponent f  | -- Ns (TODO: Find out exactly what this entails)
+
+                    Illum Illumination  | -- illum (TODO: Find out what this means)
+
+                    Dissolve f          | -- d (Dissolve; transparency)
+                    Refraction f        | -- Ni (Index of refraction; optical_density)
+
                     MapDiffuse  s | -- map_Kd
+                    MapAmbient  s | -- map_Ka
                     NewMaterial s   -- newmtl
                     deriving (Show, Eq)
+
+
+-- |
+-- 0. Color on and Ambient off
+-- 1. Color on and Ambient on
+-- 2. Highlight on
+-- 3. Reflection on and Ray trace on
+-- 4. Transparency: Glass on, Reflection: Ray trace on
+-- 5. Reflection: Fresnel on and Ray trace on
+-- 6. Transparency: Refraction on, Reflection: Fresnel off and Ray trace on
+-- 7. Transparency: Refraction on, Reflection: Fresnel on and Ray trace on
+-- 8. Reflection on and Ray trace off
+-- 9. Transparency: Glass on, Reflection: Ray trace off
+-- 10. Casts shadows onto invisible surfaces
+type Illumination = Int
 
 
 -- |
@@ -181,6 +212,8 @@ data Material f s = Material {
 -- TODO: Reconsider the types (especially of the materials)
 -- TODO: Rename accessor functions (eg. texcoords instead of textures) (?)
 --
+-- fTextures  :: S.Set s,
+--
 -- data Model f s i m = Model {
 data Model f s i m = Model {
   fVertices  :: m (V3 f),
@@ -189,7 +222,8 @@ data Model f s i m = Model {
   fFaces     :: m (Face f s i m),
   fMaterials :: MTLTable f s,       -- TODO: Type synonym (?)
   fGroups    :: M.Map (S.Set s) (i, i), -- TODO: Type synonym
-  fObjects   :: M.Map (S.Set s) (i, i)  -- TODO: Type synonym
+  fObjects   :: M.Map (S.Set s) (i, i), -- TODO: Type synonym
+  fRoot      :: Maybe FilePath          -- This is where we should look for related assets
 } -- deriving (Show, Eq)
 
 -- Monomorphic defaults --------------------------------------------------------------------------------------------------------------------

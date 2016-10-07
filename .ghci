@@ -5,8 +5,14 @@
 :set -XDuplicateRecordFields
 :set -XNamedFieldPuns
 
-import qualified Data.Text as T
+import qualified Data.Text    as T
+import qualified Data.Text.IO as T
 import qualified Data.Attoparsec.Text as Atto
+
+import qualified Graphics.WaveFront.Parse        as Parse
+import qualified Graphics.WaveFront.Parse.Common as Parse
+
+import qualified Graphics.WaveFront.Load as Load 
 
 import Control.Lens as L
 

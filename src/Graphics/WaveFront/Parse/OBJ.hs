@@ -65,7 +65,7 @@ import Graphics.WaveFront.Types hiding (texture)
 
 -- | This function creates an OBJToken or error for each line in the input data
 obj :: Atto.Parser (SimpleOBJ)
-obj = Atto.skipMany ((comment *> pure ()) <|> Atto.endOfLine) *> Atto.sepBy row lineSeparator -- <* Atto.endOfInput
+obj = cutToTheChase *> Atto.sepBy row lineSeparator -- <* Atto.endOfInput
 
 
 -- | Parses a token given a single valid OBJ row, or an error value if the input is malformed.
@@ -85,14 +85,15 @@ row = token <* ignore comment -- TODO: Let the separator handle comments (?)
 -- |
 -- Parses an OBJ token
 token :: Atto.Parser (SimpleOBJToken)
-token = (Atto.string "f"  *> face)    <|> --
-        -- TODO: How to deal with common prefix (v, vn, vt) (backtrack?)
+token = (Atto.string "f"  *> face)    <|>
+        (Atto.string "l"  *> line)    <|>
+        -- TODO: How to deal with common prefix (v, vn, vt) (backtrack?) (doesn't seem to be a problem)
         (Atto.string "vn" *> normal)  <|>
         (Atto.string "vt" *> texture) <|>
         (Atto.string "v"  *> vertex)  <|>
         (Atto.string "o"  *> object)  <|>
         (Atto.string "g"  *> group)   <|>
-        -- Atto.string "s" -- Smooth shading (TODO: Don't ignore)
+        (Atto.string "s"  *> smooth)  <|> -- Smooth shading (TODO: Don't ignore)
         (Atto.string "mtllib" *> lib) <|>
         (Atto.string "usemtl" *> use)
 
@@ -102,12 +103,17 @@ token = (Atto.string "f"  *> face)    <|> --
 
 -- |
 face :: Atto.Parser (SimpleOBJToken)
-face = OBJFace    <$> atleast 3 (space *> vertexIndices)
+face = OBJFace <$> atleast 3 (space *> vertexIndices)
+
+
+-- |
+line :: Atto.Parser (SimpleOBJToken)
+line = Line <$> (space *> Atto.decimal) <*> (space *> Atto.decimal)
 
 
 -- |
 normal :: Atto.Parser (SimpleOBJToken)
-normal = OBJNormal  <$> point3D
+normal = OBJNormal <$> point3D
 
 
 -- |
@@ -131,20 +137,32 @@ group = Group . S.fromList <$> atleast 1 (space *> name)
 
 
 -- |
+smooth :: Atto.Parser (SimpleOBJToken)
+smooth = SmoothShading <$> (space *> toggle)
+
+
+-- |
 lib :: Atto.Parser (SimpleOBJToken)
 lib = LibMTL <$> (space *> name)
 
 
 -- |
 use :: Atto.Parser (SimpleOBJToken)
-use = UseMTL <$> (space *> word)
+use = UseMTL <$> (space *> name)
 
 
 -- | A single vertex definition with indices for vertex position, normal, and texture coordinates
 -- TODO: Should the slashes be optional?
+-- TODO: PLEASE FIX THIS, FUTURE SELF
+-- f Int[/((Int[/Int])|(/Int))]
+-- VertexIndices ivert inorm itex
 vertexIndices :: Atto.Parser (VertexIndices Int64)
 vertexIndices = VertexIndices <$>
-            (Atto.decimal          <* Atto.char '/') <*>
-            (optional Atto.decimal <* Atto.char '/') <*>
-            (optional Atto.decimal)
+                  Atto.decimal <*>
+                  ((Atto.char '/' *> (Just <$> Atto.decimal   <|> pure Nothing)) <|> pure Nothing) <*>
+                  ((Atto.char '/' *> (Just <$> Atto.decimal)) <|> pure Nothing)
+                  -- ((Atto.char '/' *> Atto.decimal) <|> (Atto.char '/' *> pure Nothing *> ))
+                  -- optional (Atto.char '/' *> )
+                  -- optional (Atto.char '/' *> optional Atto.decimal) <*>
+                  -- optional (Atto.char '/' *> optional Atto.decimal)
     

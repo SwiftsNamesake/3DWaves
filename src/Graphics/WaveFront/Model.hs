@@ -22,7 +22,7 @@
 {-# LANGUAGE UnicodeSyntax     #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE OverloadedLists   #-}
+--{-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE FlexibleContexts  #-}
 
@@ -37,7 +37,8 @@ module Graphics.WaveFront.Model (
   facesOf,  materialsOf,
   tessellate, bounds,
   hasTextures, textures,
-  createModel, createMTLTable
+  createModel, createMTLTable,
+  fromIndices, fromFaceIndices, diffuseColours
 ) where
 
 
@@ -46,7 +47,7 @@ module Graphics.WaveFront.Model (
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
 import qualified Data.Vector as V
--- import           Data.Vector ((!))
+import           Data.Vector ((!?))
 
 import qualified Data.Text   as T
 import qualified Data.Map    as M
@@ -54,13 +55,10 @@ import qualified Data.Set    as S
 
 import Data.List   (groupBy)
 import Data.Maybe  (listToMaybe, catMaybes)
-import Data.Either (rights)
 
 import Data.Int (Int64)
 
-import Control.Applicative
-
-import Linear (V2(..), V3(..))
+import Linear (V3(..))
 
 import Control.Lens ((^.), (%~), _3)
 
@@ -129,17 +127,18 @@ buildIndexMapWith tokens = M.fromList . pairwise zipIndices . reverse . addLastI
 -- TODO: Improve naming scheme (lots of primes)
 -- TODO: Default material, take 'error-handling' function (?)
 -- TODO: Can vertices in the same face have different materials (?)
-facesOf :: [SimpleOBJToken] -> SimpleMTLTable -> [Either T.Text SimpleFace]
+facesOf :: [SimpleOBJToken] -> SimpleMTLTable -> [Either String SimpleFace]
 facesOf tokens table = reverse . (^._3) . foldl update ("", "", []) $ tokens
-  where retrieve lib mat       = M.lookup lib table >>= M.lookup mat
-        createFace lib mat ind = case retrieve lib mat of
-                                   Nothing -> Left  $ T.concat ["No such material: ", lib, ".", mat]
-                                   Just m  -> Right $ Face { fIndices=ind, fMaterial=m }
-        update (lib', material', faces') token = case token of
-                                                   OBJFace ind -> (lib', material', createFace lib' material' ind : faces')
-                                                   LibMTL  lib -> (lib,  material', faces')
-                                                   UseMTL  mat -> (lib', mat,       faces')
-                                                   _           -> (lib', material', faces')
+  where 
+    retrieve lib mat       = M.lookup lib table >>= M.lookup mat
+    createFace lib mat ind = case retrieve lib mat of
+                               Nothing -> Left  $ concat ["No such material: ", T.unpack lib, ".", T.unpack mat]
+                               Just m  -> Right $ Face { fIndices=ind, fMaterial=m }
+    update (lib', material', faces') token = case token of
+                                               OBJFace ind -> (lib', material', createFace lib' material' ind : faces')
+                                               LibMTL  lib -> (lib,  material', faces')
+                                               UseMTL  mat -> (lib', mat,       faces')
+                                               _           -> (lib', material', faces')
 
 -- Parser output churners (MTL) ------------------------------------------------------------------------------------------------------------
 
@@ -150,14 +149,14 @@ facesOf tokens table = reverse . (^._3) . foldl update ("", "", []) $ tokens
 -- TODO: Pass in error function (would allow for more flexible error handling) (?)
 -- TODO: Filter out parser failures (?)
 -- TOOD: Deal with duplicated attributes (probably won't crop up in any real situations)
-materialsOf :: [SimpleMTLToken] -> M.Map T.Text (Either T.Text SimpleMaterial)
-materialsOf tokens = M.fromList . rights $ map createMaterial thegroups
+materialsOf :: [SimpleMTLToken] -> Either String (M.Map T.Text (SimpleMaterial))
+materialsOf tokens = M.fromList <$> sequence (map createMaterial thegroups)
   where
     thegroups = groupBy (((not . isnew) .) . flip const) tokens -- TODO: Refactor this atrocity
     isnew (NewMaterial _) = True  -- TODO: Rename isnew
     isnew  _              = False
-    createMaterial (NewMaterial name:attrs) = Right $ (name, fromAttributes attrs)
-    createMaterial  attrs                   = Left  $ T.concat ["Free-floating attributes: ", T.pack . show $ attrs]
+    createMaterial (NewMaterial name:attrs) = (name,) <$> fromAttributes attrs
+    createMaterial  attrs                   = Left  $ concat ["Free-floating attributes: ", show $ attrs]
     fromAttributes  attrs = case colours of
       Nothing                -> Left  $ "Missing colour(s)" -- TODO: More elaborate message (eg. which colour)
       Just (amb, diff, spec) -> Right $ Material { fAmbient=amb,fDiffuse=diff, fSpecular=spec, fTexture=listToMaybe [ name | MapDiffuse name <- attrs ] }
@@ -173,11 +172,8 @@ materialsOf tokens = M.fromList . rights $ map createMaterial thegroups
 -- |
 -- TODO: Debug information (eg. how many invalid materials were filtered out)
 -- TODO: Refactor, simplify
-createMTLTable :: [(T.Text, [SimpleMTLToken])] -> SimpleMTLTable
-createMTLTable mtls = M.fromList . map (\ (name, tokens) -> (name, M.mapMaybe prune . materialsOf $ tokens)) $ mtls
-  where
-    prune (Right mat) = Just mat
-    prune (Left  _)   = Nothing
+createMTLTable :: [(T.Text, [SimpleMTLToken])] -> Either String (SimpleMTLTable)
+createMTLTable mtls = M.fromList <$> mapM (\ (name, tokens) -> (name,) <$> materialsOf tokens) mtls
 
 -- API functions ---------------------------------------------------------------------------------------------------------------------------
 
@@ -196,17 +192,18 @@ createMTLTable mtls = M.fromList . map (\ (name, tokens) -> (name, M.mapMaybe pr
 --
 -- I never knew pattern matching in list comprehensions could be used to filter by constructor
 -- let rows = parseOBJ data in ([ v | @v(Vertex {}) <- rows], [ v | @v(Vertex {}) <- rows])
-createModel :: SimpleOBJ -> SimpleMTLTable -> SimpleModel -- Either String SimpleModel
-createModel modeldata thematerials = Model { fVertices  = V.fromList [ vec | OBJVertex  vec <- modeldata ],
-                                             fNormals   = V.fromList [ vec | OBJNormal  vec <- modeldata ],
-                                             fTexcoords = V.fromList [ vec | OBJTexture vec <- modeldata ],
-                                             fFaces     = packFaces theFaces,
-                                             fGroups    = groupsOf  modeldata,
-                                             fObjects   = objectsOf modeldata,
-                                             fMaterials = thematerials }
+createModel :: SimpleOBJ -> SimpleMTLTable -> Maybe FilePath -> Either String (SimpleModel) -- Either String SimpleModel
+createModel tokens materials root = do
+    faces' <- sequence $ facesOf tokens materials -- TODO: Don't just filter out the degenerate faces
+    return $ Model { fVertices  = V.fromList [ vec | OBJVertex  vec <- tokens ],
+                     fNormals   = V.fromList [ vec | OBJNormal  vec <- tokens ],
+                     fTexcoords = V.fromList [ vec | OBJTexture vec <- tokens ],
+                     fFaces     = packFaces faces',
+                     fGroups    = groupsOf  tokens,
+                     fObjects   = objectsOf tokens,
+                     fMaterials = materials,
+                     fRoot      = root }
   where
-    theFaces  = rights $ facesOf modeldata thematerials -- TODO: Don't just filter out the degenerate faces
-    
     packFace :: Face Double T.Text Int64 [] -> Face Double T.Text Int64 V.Vector
     packFace face@(Face { fIndices }) = face { fIndices=V.fromList fIndices } -- indices %~ (_) -- TODO: Type-changing lenses
 
@@ -214,21 +211,6 @@ createModel modeldata thematerials = Model { fVertices  = V.fromList [ vec | OBJ
     packFaces = V.fromList . map (packFace . tessellate)
 
 
--- | Extracts vertex, normal, texture and material data from a model
--- TODO: Figure out how to deal with missing indices
--- TODO: Refactor, optimise
--- TODO: Indexable typeclass
--- modelAttributes :: SimpleModel -> (SimpleVertices, SimpleTexCoords, SimpleNormals, SimpleMaterials)
--- modelAttributes model = unzip4 $ concat [ map (attributesAt mat) theindices | Face { fMaterial=mat, fIndices=theindices } <- model^.faces ]
---   where
---     vertexAt   = ((model^.vertices) !)          . fromIntegral . subtract 1 --
---     normalAt   = liftM $ ((model^.normals)   !) . fromIntegral . subtract 1 --
---     texcoordAt = liftM $ ((model^.texcoords) !) . fromIntegral . subtract 1 --
---     attributesAt mat (VertexIndices {fIvertex, fItexcoord, fInormal}) = (vertexAt fIvertex, texcoordAt fItexcoord, normalAt fInormal, mat)
---     -- collect (vs, ts, ns, mats)    = (Vertices vs, TexCoords ts, Normals ns, Materials mats)
-
-
--- |
 -- TODO: Specialise to [[Face]] (?)
 -- TODO: Check vertex count (has to be atleast three)
 -- TODO: Better names (?)
@@ -237,10 +219,6 @@ tessellate = indices %~ triangles
   where
     triangles []       = []
     triangles (a:rest) = concat $ pairwise (\b c -> [a, b, c]) rest
-
-
--- |
--- unpackModelAttributes ::
 
 
 -- |
@@ -257,6 +235,27 @@ bounds model = fromExtents $ (axisBounds $ model^.vertices) <$> V3 x y z
     minmaxBy f values = foldr (\val' acc -> let val = f val' in (min val (fst acc), max val (snd acc))) (0, 0) values -- TODO: Factor out
 
     axisBounds vs axis = minmaxBy (^.axis) vs
+
+
+-- TODO: Deal with missing values properly
+-- TODO: Indexing should be defined in an API function
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+-- |
+-- TODO: Factor out the buffer-building logic
+fromIndices :: V.Vector (v Double) -> (VertexIndices Int64 ->  Int64) -> V.Vector (Face Double T.Text Int64 V.Vector) -> V.Vector (Maybe (v Double))
+fromIndices data' choose faces' = V.concatMap (fromFaceIndices data' choose) faces'
+
+
+-- |
+fromFaceIndices :: V.Vector (v Double) -> (VertexIndices Int64 ->  Int64) -> Face Double T.Text Int64 V.Vector -> V.Vector (Maybe (v Double))
+fromFaceIndices data' choose face' = V.map ((data' !?) . fromIntegral . subtract 1 . choose) . (^.indices) $ face'
+
+
+-- |
+diffuseColours :: V.Vector (Face f s i V.Vector) -> V.Vector (Colour f)
+diffuseColours faces' = V.concatMap (\f -> V.replicate (V.length $ f^.indices) (f^.material.diffuse)) faces'
 
 -- Model queries ---------------------------------------------------------------------------------------------------------------------------
 

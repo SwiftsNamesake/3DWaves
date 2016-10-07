@@ -64,7 +64,8 @@ flag profile
 
 library
   -- Modules exported by the library.
-  exposed-modules:     Graphics.WaveFront.Types,
+  exposed-modules:     Graphics.WaveFront,
+                       Graphics.WaveFront.Types,
                        Graphics.WaveFront.Lenses,
                        Graphics.WaveFront.Parse,
                        Graphics.WaveFront.Load,
@@ -96,6 +97,7 @@ library
   build-depends:         base == 4.*
                        , lens <= 4.14
                        , either
+                       , transformers
                        , linear
                        , vector
                        , text
@@ -112,12 +114,12 @@ library
   default-language:    Haskell2010
 
 
-executable SampleApp
+executable Viewer
   -- Haskell source directories
   hs-source-dirs:      app
   
   -- Name of the main file
-  main-is:             SampleApp.hs
+  main-is:             Viewer.hs
 
   -- TODO: Parallel compilation and larger stack
   -- ghci -j8 +RTS -A128m
@@ -134,11 +136,18 @@ executable SampleApp
                          -fwarn-monomorphism-restriction
                          -fwarn-orphans
   
+  if flag(profile)
+    ghc-options:         -prof -fprof-auto -auto-all -rts-opts
+
   -- Dependencies
   build-depends:         base
                        , either
+                       , control-bool
+                       , async
                        , vector
                        , text
+                       , reactive-banana
+                       , ansi-terminal
                        , OpenGL
                        , GLUtil
                        , lens

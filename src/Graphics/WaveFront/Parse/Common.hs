@@ -34,7 +34,7 @@ module Graphics.WaveFront.Parse.Common where
 --------------------------------------------------------------------------------------------------------------------------------------------
 import qualified Data.Text as T
 
-import qualified Data.Attoparsec.Text       as Atto
+import qualified Data.Attoparsec.Text as Atto
 
 import Control.Applicative (pure, liftA2, (<$>), (<*>), (<*), (*>), (<|>))
 
@@ -49,6 +49,11 @@ import Graphics.WaveFront.Types
 --------------------------------------------------------------------------------------------------------------------------------------------
 
 -- Jon's little helpers --------------------------------------------------------------------------------------------------------------------
+
+-- |
+cutToTheChase :: Atto.Parser ()
+cutToTheChase = Atto.skipMany ((comment *> pure ()) <|> Atto.endOfLine)
+
 
 -- |
 -- TODO: Make sure this is right
@@ -94,10 +99,15 @@ word :: Atto.Parser T.Text
 word = T.pack <$> Atto.many1 Atto.letter
 
 
--- | Used primarily for object and group names
+-- | Used for texture, material, object and group names (and maybe others that I have yet to think of)
 -- TODO: Use Unicode groups, make more robust (?)
 name :: Atto.Parser T.Text
 name = T.pack <$> Atto.many1 (Atto.satisfy $ \c -> (c /= ' ') && (c /= '\t') && (c /= '\r') && (c /= '\n'))
+
+
+-- |
+toggle :: Atto.Parser Bool
+toggle = (Atto.string "off" *> pure False) <|> (Atto.string "on" *> pure True)
 
 
 -- |
@@ -131,3 +141,11 @@ point3D = V3 <$> coord <*> coord <*> coord
 -- |
 point2D :: Atto.Parser (V2 Double)
 point2D = V2 <$> coord <*> coord
+
+
+-- |
+-- TODO: Clean up and generalise
+clamped :: Int -> Int -> Atto.Parser Int
+clamped lower upper = Atto.decimal >>= \n -> if (lower <= n) && (n <= upper)
+                                               then return n
+                                               else fail "Number not in range"

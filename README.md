@@ -29,3 +29,6 @@ See source files (.hs) for additional items.
 - [ ] Proper ticket system
 - [ ] Polymorphism
 - [ ] Serialising (eg. writing to OBJ and MTL)
+- [ ] Executables
+      - OBJ viewer (?)
+      - Command line tool (?)

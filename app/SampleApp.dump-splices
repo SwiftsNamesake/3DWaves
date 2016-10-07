@@ -6,43 +6,43 @@ C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\app\SampleApp.hs:128:1-43: Sp
     instance HasClientsize AppState (V2 Int) where
       {-# INLINE clientsize #-}
       clientsize
-        f_aJt3
-        (AppState x1_aJt4 x2_aJt5 x3_aJt6 x4_aJt7 x5_aJt8)
+        f_aJx3
+        (AppState x1_aJx4 x2_aJx5 x3_aJx6 x4_aJx7 x5_aJx8)
         = fmap
-            (\ y1_aJt9 -> AppState x1_aJt4 x2_aJt5 y1_aJt9 x4_aJt7 x5_aJt8)
-            (f_aJt3 x3_aJt6)
+            (\ y1_aJx9 -> AppState x1_aJx4 x2_aJx5 y1_aJx9 x4_aJx7 x5_aJx8)
+            (f_aJx3 x3_aJx6)
     class HasFrame s a | s -> a where
       frame :: Lens' s a
     instance HasFrame AppState Int where
       {-# INLINE frame #-}
-      frame f_aJta (AppState x1_aJtb x2_aJtc x3_aJtd x4_aJte x5_aJtf)
+      frame f_aJxa (AppState x1_aJxb x2_aJxc x3_aJxd x4_aJxe x5_aJxf)
         = fmap
-            (\ y1_aJtg -> AppState x1_aJtb x2_aJtc x3_aJtd y1_aJtg x5_aJtf)
-            (f_aJta x4_aJte)
+            (\ y1_aJxg -> AppState x1_aJxb x2_aJxc x3_aJxd y1_aJxg x5_aJxf)
+            (f_aJxa x4_aJxe)
     class HasMouse s a | s -> a where
       mouse :: Lens' s a
     instance HasMouse AppState (Maybe (V2 Double)) where
       {-# INLINE mouse #-}
-      mouse f_aJth (AppState x1_aJti x2_aJtj x3_aJtk x4_aJtl x5_aJtm)
+      mouse f_aJxh (AppState x1_aJxi x2_aJxj x3_aJxk x4_aJxl x5_aJxm)
         = fmap
-            (\ y1_aJtn -> AppState x1_aJti y1_aJtn x3_aJtk x4_aJtl x5_aJtm)
-            (f_aJth x2_aJtj)
+            (\ y1_aJxn -> AppState x1_aJxi y1_aJxn x3_aJxk x4_aJxl x5_aJxm)
+            (f_aJxh x2_aJxj)
     class HasRotation s a | s -> a where
       rotation :: Lens' s a
     instance HasRotation AppState (V2 Double) where
       {-# INLINE rotation #-}
-      rotation f_aJto (AppState x1_aJtp x2_aJtq x3_aJtr x4_aJts x5_aJtt)
+      rotation f_aJxo (AppState x1_aJxp x2_aJxq x3_aJxr x4_aJxs x5_aJxt)
         = fmap
-            (\ y1_aJtu -> AppState y1_aJtu x2_aJtq x3_aJtr x4_aJts x5_aJtt)
-            (f_aJto x1_aJtp)
+            (\ y1_aJxu -> AppState y1_aJxu x2_aJxq x3_aJxr x4_aJxs x5_aJxt)
+            (f_aJxo x1_aJxp)
     class HasScene s a | s -> a where
       scene :: Lens' s a
     instance HasScene AppState Scene where
       {-# INLINE scene #-}
-      scene f_aJtv (AppState x1_aJtw x2_aJtx x3_aJty x4_aJtz x5_aJtA)
+      scene f_aJxv (AppState x1_aJxw x2_aJxx x3_aJxy x4_aJxz x5_aJxA)
         = fmap
-            (\ y1_aJtB -> AppState x1_aJtw x2_aJtx x3_aJty x4_aJtz y1_aJtB)
-            (f_aJtv x5_aJtA)
+            (\ y1_aJxB -> AppState x1_aJxw x2_aJxx x3_aJxy x4_aJxz y1_aJxB)
+            (f_aJxv x5_aJxA)
 C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\app\SampleApp.hs:129:1-40: Splicing declarations
     makeLensesWith abbreviatedFields ''Scene
   ======>
@@ -50,7 +50,7 @@ C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\app\SampleApp.hs:129:1-40: Sp
       meshes :: Lens' s a
     instance HasMeshes Scene [Mesh Double Int] where
       {-# INLINE meshes #-}
-      meshes = iso (\ (Scene x_aJxc) -> x_aJxc) Scene
+      meshes = iso (\ (Scene x_aJBc) -> x_aJBc) Scene
 C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\app\SampleApp.hs:128:1-43: Splicing declarations
     makeLensesWith abbreviatedFields ''AppState
   ======>
@@ -59,43 +59,43 @@ C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\app\SampleApp.hs:128:1-43: Sp
     instance HasClientsize AppState (V2 Int) where
       {-# INLINE clientsize #-}
       clientsize
-        f_aMFK
-        (AppState x1_aMFL x2_aMFM x3_aMFN x4_aMFO x5_aMFP)
+        f_aM23
+        (AppState x1_aM24 x2_aM25 x3_aM26 x4_aM27 x5_aM28)
         = fmap
-            (\ y1_aMFQ -> AppState x1_aMFL x2_aMFM y1_aMFQ x4_aMFO x5_aMFP)
-            (f_aMFK x3_aMFN)
+            (\ y1_aM29 -> AppState x1_aM24 x2_aM25 y1_aM29 x4_aM27 x5_aM28)
+            (f_aM23 x3_aM26)
     class HasFrame s a | s -> a where
       frame :: Lens' s a
     instance HasFrame AppState Int where
       {-# INLINE frame #-}
-      frame f_aMFR (AppState x1_aMFS x2_aMFT x3_aMFU x4_aMFV x5_aMFW)
+      frame f_aM2a (AppState x1_aM2b x2_aM2c x3_aM2d x4_aM2e x5_aM2f)
         = fmap
-            (\ y1_aMFX -> AppState x1_aMFS x2_aMFT x3_aMFU y1_aMFX x5_aMFW)
-            (f_aMFR x4_aMFV)
+            (\ y1_aM2g -> AppState x1_aM2b x2_aM2c x3_aM2d y1_aM2g x5_aM2f)
+            (f_aM2a x4_aM2e)
     class HasMouse s a | s -> a where
       mouse :: Lens' s a
     instance HasMouse AppState (Maybe (V2 Double)) where
       {-# INLINE mouse #-}
-      mouse f_aMFY (AppState x1_aMFZ x2_aMG0 x3_aMG1 x4_aMG2 x5_aMG3)
+      mouse f_aM2h (AppState x1_aM2i x2_aM2j x3_aM2k x4_aM2l x5_aM2m)
         = fmap
-            (\ y1_aMG4 -> AppState x1_aMFZ y1_aMG4 x3_aMG1 x4_aMG2 x5_aMG3)
-            (f_aMFY x2_aMG0)
+            (\ y1_aM2n -> AppState x1_aM2i y1_aM2n x3_aM2k x4_aM2l x5_aM2m)
+            (f_aM2h x2_aM2j)
     class HasRotation s a | s -> a where
       rotation :: Lens' s a
     instance HasRotation AppState (V2 Double) where
       {-# INLINE rotation #-}
-      rotation f_aMG5 (AppState x1_aMG6 x2_aMG7 x3_aMG8 x4_aMG9 x5_aMGa)
+      rotation f_aM2o (AppState x1_aM2p x2_aM2q x3_aM2r x4_aM2s x5_aM2t)
         = fmap
-            (\ y1_aMGb -> AppState y1_aMGb x2_aMG7 x3_aMG8 x4_aMG9 x5_aMGa)
-            (f_aMG5 x1_aMG6)
+            (\ y1_aM2u -> AppState y1_aM2u x2_aM2q x3_aM2r x4_aM2s x5_aM2t)
+            (f_aM2o x1_aM2p)
     class HasScene s a | s -> a where
       scene :: Lens' s a
     instance HasScene AppState Scene where
       {-# INLINE scene #-}
-      scene f_aMGc (AppState x1_aMGd x2_aMGe x3_aMGf x4_aMGg x5_aMGh)
+      scene f_aM2v (AppState x1_aM2w x2_aM2x x3_aM2y x4_aM2z x5_aM2A)
         = fmap
-            (\ y1_aMGi -> AppState x1_aMGd x2_aMGe x3_aMGf x4_aMGg y1_aMGi)
-            (f_aMGc x5_aMGh)
+            (\ y1_aM2B -> AppState x1_aM2w x2_aM2x x3_aM2y x4_aM2z y1_aM2B)
+            (f_aM2v x5_aM2A)
 C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\app\SampleApp.hs:129:1-40: Splicing declarations
     makeLensesWith abbreviatedFields ''Scene
   ======>
@@ -103,7 +103,7 @@ C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\app\SampleApp.hs:129:1-40: Sp
       meshes :: Lens' s a
     instance HasMeshes Scene [Mesh Double Int] where
       {-# INLINE meshes #-}
-      meshes = iso (\ (Scene x_aMJa) -> x_aMJa) Scene
+      meshes = iso (\ (Scene x_aM5t) -> x_aM5t) Scene
 C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\app\SampleApp.hs:128:1-43: Splicing declarations
     makeLensesWith abbreviatedFields ''AppState
   ======>
@@ -112,43 +112,43 @@ C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\app\SampleApp.hs:128:1-43: Sp
     instance HasClientsize AppState (V2 Int) where
       {-# INLINE clientsize #-}
       clientsize
-        f_aOUG
-        (AppState x1_aOUH x2_aOUI x3_aOUJ x4_aOUK x5_aOUL)
+        f_aPHb
+        (AppState x1_aPHc x2_aPHd x3_aPHe x4_aPHf x5_aPHg)
         = fmap
-            (\ y1_aOUM -> AppState x1_aOUH x2_aOUI y1_aOUM x4_aOUK x5_aOUL)
-            (f_aOUG x3_aOUJ)
+            (\ y1_aPHh -> AppState x1_aPHc x2_aPHd y1_aPHh x4_aPHf x5_aPHg)
+            (f_aPHb x3_aPHe)
     class HasFrame s a | s -> a where
       frame :: Lens' s a
     instance HasFrame AppState Int where
       {-# INLINE frame #-}
-      frame f_aOUN (AppState x1_aOUO x2_aOUP x3_aOUQ x4_aOUR x5_aOUS)
+      frame f_aPHi (AppState x1_aPHj x2_aPHk x3_aPHl x4_aPHm x5_aPHn)
         = fmap
-            (\ y1_aOUT -> AppState x1_aOUO x2_aOUP x3_aOUQ y1_aOUT x5_aOUS)
-            (f_aOUN x4_aOUR)
+            (\ y1_aPHo -> AppState x1_aPHj x2_aPHk x3_aPHl y1_aPHo x5_aPHn)
+            (f_aPHi x4_aPHm)
     class HasMouse s a | s -> a where
       mouse :: Lens' s a
     instance HasMouse AppState (Maybe (V2 Double)) where
       {-# INLINE mouse #-}
-      mouse f_aOUU (AppState x1_aOUV x2_aOUW x3_aOUX x4_aOUY x5_aOUZ)
+      mouse f_aPHp (AppState x1_aPHq x2_aPHr x3_aPHs x4_aPHt x5_aPHu)
         = fmap
-            (\ y1_aOV0 -> AppState x1_aOUV y1_aOV0 x3_aOUX x4_aOUY x5_aOUZ)
-            (f_aOUU x2_aOUW)
+            (\ y1_aPHv -> AppState x1_aPHq y1_aPHv x3_aPHs x4_aPHt x5_aPHu)
+            (f_aPHp x2_aPHr)
     class HasRotation s a | s -> a where
       rotation :: Lens' s a
     instance HasRotation AppState (V2 Double) where
       {-# INLINE rotation #-}
-      rotation f_aOV1 (AppState x1_aOV2 x2_aOV3 x3_aOV4 x4_aOV5 x5_aOV6)
+      rotation f_aPHw (AppState x1_aPHx x2_aPHy x3_aPHz x4_aPHA x5_aPHB)
         = fmap
-            (\ y1_aOV7 -> AppState y1_aOV7 x2_aOV3 x3_aOV4 x4_aOV5 x5_aOV6)
-            (f_aOV1 x1_aOV2)
+            (\ y1_aPHC -> AppState y1_aPHC x2_aPHy x3_aPHz x4_aPHA x5_aPHB)
+            (f_aPHw x1_aPHx)
     class HasScene s a | s -> a where
       scene :: Lens' s a
     instance HasScene AppState Scene where
       {-# INLINE scene #-}
-      scene f_aOV8 (AppState x1_aOV9 x2_aOVa x3_aOVb x4_aOVc x5_aOVd)
+      scene f_aPHD (AppState x1_aPHE x2_aPHF x3_aPHG x4_aPHH x5_aPHI)
         = fmap
-            (\ y1_aOVe -> AppState x1_aOV9 x2_aOVa x3_aOVb x4_aOVc y1_aOVe)
-            (f_aOV8 x5_aOVd)
+            (\ y1_aPHJ -> AppState x1_aPHE x2_aPHF x3_aPHG x4_aPHH y1_aPHJ)
+            (f_aPHD x5_aPHI)
 C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\app\SampleApp.hs:129:1-40: Splicing declarations
     makeLensesWith abbreviatedFields ''Scene
   ======>
@@ -156,4 +156,57 @@ C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\app\SampleApp.hs:129:1-40: Sp
       meshes :: Lens' s a
     instance HasMeshes Scene [Mesh Double Int] where
       {-# INLINE meshes #-}
-      meshes = iso (\ (Scene x_aOY6) -> x_aOY6) Scene
+      meshes = iso (\ (Scene x_aPKB) -> x_aPKB) Scene
+C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\app\SampleApp.hs:128:1-43: Splicing declarations
+    makeLensesWith abbreviatedFields ''AppState
+  ======>
+    class HasClientsize s a | s -> a where
+      clientsize :: Lens' s a
+    instance HasClientsize AppState (V2 Int) where
+      {-# INLINE clientsize #-}
+      clientsize
+        f_aSz9
+        (AppState x1_aSza x2_aSzb x3_aSzc x4_aSzd x5_aSze)
+        = fmap
+            (\ y1_aSzf -> AppState x1_aSza x2_aSzb y1_aSzf x4_aSzd x5_aSze)
+            (f_aSz9 x3_aSzc)
+    class HasFrame s a | s -> a where
+      frame :: Lens' s a
+    instance HasFrame AppState Int where
+      {-# INLINE frame #-}
+      frame f_aSzg (AppState x1_aSzh x2_aSzi x3_aSzj x4_aSzk x5_aSzl)
+        = fmap
+            (\ y1_aSzm -> AppState x1_aSzh x2_aSzi x3_aSzj y1_aSzm x5_aSzl)
+            (f_aSzg x4_aSzk)
+    class HasMouse s a | s -> a where
+      mouse :: Lens' s a
+    instance HasMouse AppState (Maybe (V2 Double)) where
+      {-# INLINE mouse #-}
+      mouse f_aSzn (AppState x1_aSzo x2_aSzp x3_aSzq x4_aSzr x5_aSzs)
+        = fmap
+            (\ y1_aSzt -> AppState x1_aSzo y1_aSzt x3_aSzq x4_aSzr x5_aSzs)
+            (f_aSzn x2_aSzp)
+    class HasRotation s a | s -> a where
+      rotation :: Lens' s a
+    instance HasRotation AppState (V2 Double) where
+      {-# INLINE rotation #-}
+      rotation f_aSzu (AppState x1_aSzv x2_aSzw x3_aSzx x4_aSzy x5_aSzz)
+        = fmap
+            (\ y1_aSzA -> AppState y1_aSzA x2_aSzw x3_aSzx x4_aSzy x5_aSzz)
+            (f_aSzu x1_aSzv)
+    class HasScene s a | s -> a where
+      scene :: Lens' s a
+    instance HasScene AppState Scene where
+      {-# INLINE scene #-}
+      scene f_aSzB (AppState x1_aSzC x2_aSzD x3_aSzE x4_aSzF x5_aSzG)
+        = fmap
+            (\ y1_aSzH -> AppState x1_aSzC x2_aSzD x3_aSzE x4_aSzF y1_aSzH)
+            (f_aSzB x5_aSzG)
+C:\Users\Jonatan\Desktop\Haskell\modules\WaveFront\app\SampleApp.hs:129:1-40: Splicing declarations
+    makeLensesWith abbreviatedFields ''Scene
+  ======>
+    class HasMeshes s a | s -> a where
+      meshes :: Lens' s a
+    instance HasMeshes Scene [Mesh Double Int] where
+      {-# INLINE meshes #-}
+      meshes = iso (\ (Scene x_aSCz) -> x_aSCz) Scene
