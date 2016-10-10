@@ -6,9 +6,6 @@
 -- Maintainer  : Jonatan H Sundqvist
 -- Stability   : experimental|stable
 -- Portability : POSIX (not sure)
---
-
--- Created July 26 2015
 
 -- TODO | - Logging
 --        -

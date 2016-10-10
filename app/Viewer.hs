@@ -1,14 +1,11 @@
 -- |
 -- Module      : SampleApp - Main
 -- Description : Executable which loads a model and displays it using OpenGL
--- Copyright   : (c) Jonatan H Sundqvist, 2015
+-- Copyright   : (c) Jonatan H Sundqvist, 2016
 -- License     : MIT
 -- Maintainer  : Jonatan H Sundqvist
 -- Stability   : experimental|stable
 -- Portability : POSIX (not sure)
---
-
--- Created July 15 2015
 
 -- TODO | - Break up the functionality of this program into several modules
 --        - FPS
@@ -31,6 +28,7 @@
 {-# LANGUAGE TupleSections          #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE NamedFieldPuns         #-}
+
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------
@@ -58,8 +56,6 @@ import qualified Data.Set as S
 import Text.Printf (printf)
 import Text.Read   (readMaybe)
 
-import Graphics.UI.GLFW as GLFW (MouseButton(..), MouseButtonState(..))
-
 import Linear (V2(..), V3(..), M44, (!*!), perspective, translation, identity) -- Quaternion
 
 import System.Console.ANSI
@@ -68,7 +64,8 @@ import System.IO        (hFlush, stdout)
 
 import Control.Monad.Trans.Either
 import Control.Monad.Trans.Class (lift)
-import Control.Monad (forM_, forM, liftM, unless, void, (<=<))
+import Control.Monad (forM_, forM, liftM, unless, forever, void, (<=<))
+import Control.Monad.Extra (skip)
 import Control.Bool
 import Control.Applicative (liftA2)
 import Control.Lens
@@ -80,6 +77,8 @@ import GHC.Stack
 
 import Foreign.C.Types
 import Foreign.Storable (Storable)
+
+import Graphics.UI.GLFW as GLFW (MouseButton(..), MouseButtonState(..))
 
 import           Graphics.Rendering.OpenGL as GL hiding (perspective, ortho, rotate, translate, scale, texture)
 import           Graphics.Rendering.OpenGL.GL.Shaders.ShaderObjects
@@ -95,12 +94,8 @@ import           Graphics.Michelangelo.Texture            --
 import           Graphics.Michelangelo.Transformations    --
 import qualified Graphics.Michelangelo.Mesh    as Mesh    --
 import qualified Graphics.Michelangelo.Lenses  as L
-import qualified Graphics.Michelangelo.Shaders as Shaders --
+import qualified Graphics.Michelangelo.Shaders as Shader --
 import           Graphics.Michelangelo.Types (UniformValue(..), Mesh(..), Attribute(..)) --
-
-
--- TODO: These functions (untilM, clamped, perhaps) should be imported from some sensibly named utility module instead
-import Interactive.Console (chooseFilesFromDirectory, untilM, clamped, perhaps)
 
 import Cartesian.Core (centre, x, y, z, size, corner, width, height, depth)
 
@@ -144,7 +139,8 @@ data AppState = AppState {
   fClientsize :: V2 Int,
   fFrame      :: Int,
   fScene      :: Scene,
-  fWindow     :: GLFW.Window
+  fWindow     :: GLFW.Window,
+  fCommand    :: MVar String
 } -- deriving (Show)
 
 
@@ -201,6 +197,8 @@ render app = do
   viewport   $= (Position 0 0, Size cx cy)
   clearColor $= Color4 (0.2) (0.72) (0.23) (1.0)
   clear [ColorBuffer, DepthBuffer]
+
+
   GLFW.swapBuffers (app^.window)
   where
     (V2 cx cy) = fromIntegral <$> app^.clientsize
@@ -208,7 +206,7 @@ render app = do
 
 -- |
 attr :: (Foldable t, Foldable v, Storable f, Real f) => GL.Program -> (String, t (v f)) -> EitherT String IO (String, Attribute Int)
-attr theprogram = EitherT . uncurry (Mesh.newAttribute theprogram)
+attr program' = EitherT . uncurry (Shader.newAttribute program')
 
 
 -- |
@@ -255,9 +253,9 @@ createTexturedMesh program' model = runEitherT $ do
                 fShader     = program',
                 fUniforms   = uniforms',
                 fPrepare    = Just prepareTextured,
-                fCentre     = V3 0 0 0, --centre',
+                fCentre     = V3 0 0 0,
                 fBounds     = WF.bounds model,
-                fSize       = (length $ vs) `div` 3 }
+                fSize       = (length $ vs) }
   where
     (Just vs) = sequence $ WF.fromIndices (model^.vertices)  (^.ivertex) (model^.faces)
     -- TODO: Deal with missing values properly (w.r.t texcoords and normals)
@@ -280,6 +278,7 @@ onmousepress _ _ _ _ = putStrLn "Mouse button was pressed"
 mainloop :: IORef AppState -> IO ()
 mainloop appref = do
   app <- readIORef appref
+  maybe skip runCommand <$> tryTakeMVar (app^.command)
   render app
   GLFW.pollEvents
   unlessM (GLFW.windowShouldClose (app^.window)) (mainloop appref)
@@ -319,6 +318,18 @@ loadMeshes shader' fns = do
   -- 
   -- Either String SimpleModel -> IO (Either String (Mesh Double Int))
   mapM (either (return . Left) (createTexturedMesh shader')) models
+
+-- Scripting -------------------------------------------------------------------------------------------------------------------------------
+
+-- |
+feedCommand :: MVar String -> IO ()
+feedCommand command' = getLine >>= putMVar command'
+
+
+-- |
+runCommand :: String -> IO ()
+runCommand cmd = do
+  return ()
 
 -- FRP -------------------------------------------------------------------------------------------------------------------------------------
 
@@ -405,14 +416,15 @@ config = Config {
 
 
 -- | The initial application state
-initial :: GLFW.Window -> Config -> AppState
-initial window' config' = AppState {
-                            fCamera     = Camera { fRotation = identity, fPosition = identity },
-                            fMouse      = Nothing,
-                            fClientsize = config'^.clientsize,
-                            fFrame      = 1, -- TODO: Should this be 0 (?)
-                            fWindow     = window',
-                            fScene      = Scene { fMeshes = [] } }
+initial :: GLFW.Window -> MVar String -> Config -> AppState
+initial window' command' config' = AppState {
+                                     fCamera     = Camera { fRotation = identity, fPosition = identity },
+                                     fMouse      = Nothing,
+                                     fClientsize = config'^.clientsize,
+                                     fFrame      = 1, -- TODO: Should this be 0 (?)
+                                     fWindow     = window',
+                                     fCommand    = command',
+                                     fScene      = Scene { fMeshes = [] } }
 
 --------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -440,11 +452,15 @@ main = void . runEitherT $ do
     return ()
   
   lift prepareGraphics
-  shader' <- EitherT $ mapLeft concat <$> (Shaders.createProgram Shaders.textured)
+  shader' <- EitherT $ mapLeft concat <$> (Shader.createProgram Shader.textured)
   meshes' <- lift $ loadMeshes shader' ["assets/models/hombre.obj", "assets/models/minecraft1.obj", "assets/models/king.obj", "assets/models/villa.obj"]
   let meshList = map snd . M.toList . (M.mapMaybe (either (const Nothing) Just)) $ meshes'
   lift $ do
-    newIORef (initial window' config & scene.meshes .~ meshList) >>= mainloop
+    command' <- newEmptyMVar
+    appref   <- newIORef (initial window' command' config & scene.meshes .~ meshList)
+    cmd <- async (forever $ feedCommand command')
+    mainloop appref
+    cancel cmd
     GLFW.destroyWindow window'
     GLFW.terminate
 

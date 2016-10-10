@@ -145,28 +145,50 @@ facesOf tokens table = reverse . (^._3) . foldl update ("", "", []) $ tokens
 -- | Constructs a map between names and materials. Partially or wholly undefined materials
 --   are mapped to a string detailing the error (eg. Left "missing specular").
 --
--- TODO: Debug information (eg. attributes without an associated material)
--- TODO: Pass in error function (would allow for more flexible error handling) (?)
--- TODO: Filter out parser failures (?)
--- TOOD: Deal with duplicated attributes (probably won't crop up in any real situations)
-materialsOf :: [SimpleMTLToken] -> Either String (M.Map T.Text (SimpleMaterial))
-materialsOf tokens = M.fromList <$> sequence (map createMaterial thegroups)
+-- TODO | - Debug information (eg. attributes without an associated material)
+--        - Pass in error function (would allow for more flexible error handling) (?)
+--        - Filter out parser failures (?)
+--        - Deal with duplicated attributes (probably won't crop up in any real situations)
+--        - Factor single material function
+materialsOf :: Ord s => [MTLToken f s] -> Either String (M.Map s (Material f s))
+materialsOf = fmap M.fromList . mapM createMaterial . partitionMaterials
+
+
+-- | Creates a new (name, material) pair from a stream of MTL tokens.
+--   The first token should be a new material name.
+createMaterial :: [MTLToken f s] -> Either String (s, Material f s)
+createMaterial (NewMaterial name:attrs) = (name,) <$> fromAttributes attrs
+createMaterial  attrs                   = Left  $ "Free-floating attributes"
+
+
+-- |
+-- TODO: Rename (eg. groupMaterials) (?)
+-- ((not . isnew) .) . flip const
+partitionMaterials :: [MTLToken f s] -> [[MTLToken f s]]
+partitionMaterials = groupBy (\_ b -> isNewMaterial b)
   where
-    thegroups = groupBy (((not . isnew) .) . flip const) tokens -- TODO: Refactor this atrocity
-    isnew (NewMaterial _) = True  -- TODO: Rename isnew
-    isnew  _              = False
-    createMaterial (NewMaterial name:attrs) = (name,) <$> fromAttributes attrs
-    createMaterial  attrs                   = Left  $ concat ["Free-floating attributes: ", show $ attrs]
-    fromAttributes  attrs = case colours of
-      Nothing                -> Left  $ "Missing colour(s)" -- TODO: More elaborate message (eg. which colour)
-      Just (amb, diff, spec) -> Right $ Material { fAmbient=amb,fDiffuse=diff, fSpecular=spec, fTexture=listToMaybe [ name | MapDiffuse name <- attrs ] }
-      where
-        -- (diff, spec, amb)
-        colours :: Maybe (Colour Double, Colour Double, Colour Double)
-        colours = (,,) <$>
-                    listToMaybe [ c | (Diffuse  c) <- attrs ] <*>
-                    listToMaybe [ c | (Specular c) <- attrs ] <*>
-                    listToMaybe [ c | (Ambient  c) <- attrs ]
+    isNewMaterial (NewMaterial _) = True
+    isNewMaterial _               = False
+
+
+-- | Creates a material
+fromAttributes :: [MTLToken f s] -> Either String (Material f s)
+fromAttributes attrs = case colours' of
+  Nothing                -> Left  $ "Missing colour(s)" -- TODO: More elaborate message (eg. which colour)
+  Just (amb, diff, spec) -> Right $ Material { fAmbient=amb,fDiffuse=diff, fSpecular=spec, fTexture=texture' }
+  where
+    colours' = materialColours attrs
+    texture' = listToMaybe [ name | MapDiffuse name <- attrs ]
+
+
+-- | Tries to extract a diffuse colour, a specular colour, and an ambient colour from a list of MTL tokens
+-- TODO: Should we really require all three colour types (?)
+-- TODO: Rename (?)
+materialColours :: [MTLToken f s] -> Maybe (Colour f, Colour f, Colour f)
+materialColours attrs = (,,) <$>
+                          listToMaybe [ c | (Diffuse  c) <- attrs ] <*>
+                          listToMaybe [ c | (Specular c) <- attrs ] <*>
+                          listToMaybe [ c | (Ambient  c) <- attrs ]
 
 
 -- |

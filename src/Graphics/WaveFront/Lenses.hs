@@ -38,7 +38,7 @@ module Graphics.WaveFront.Lenses where
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
-import Control.Lens (makeLenses, makeFields, makeLensesWith, abbreviatedFields)
+import Control.Lens (makeLensesWith, abbreviatedFields)
 
 import Graphics.WaveFront.Types
 

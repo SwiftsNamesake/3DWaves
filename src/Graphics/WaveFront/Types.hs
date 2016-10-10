@@ -76,7 +76,7 @@ data OBJToken f s i m = OBJVertex  (V3 f) |
                         Line i i | -- Line (I'm assuming the arguments are indices to the endpoint vertices)
 
                         UseMTL s | --
-                        LibMTL s | -- TODO: Use actual MTL type
+                        LibMTL s | -- 
 
                         SmoothShading Bool | -- s
 

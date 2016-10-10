@@ -10,7 +10,7 @@ name:                WaveFront
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.1.2.0
+version:             0.2.0.0
 
 -- A short (one-line) description of the package.
 synopsis:            Parsers and utilities for the OBJ WaveFront 3D model format
@@ -60,6 +60,12 @@ flag optimise
 flag profile
   description: Enable profiling options
   default:     False
+
+
+source-repository head
+  type:     git
+  -- TODO: Rename the GitHub repo (?)
+  location: https://github.com/swiftsnamesake/3DWaves
 
 
 library
@@ -124,17 +130,8 @@ executable Viewer
   -- TODO: Parallel compilation and larger stack
   -- ghci -j8 +RTS -A128m
   if flag(pedantic)
-    ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-                         -fwarn-tabs
-                         -fwarn-unused-imports
-                         -fwarn-name-shadowing
-                         -fwarn-incomplete-uni-patterns
-                         -fwarn-incomplete-patterns
-                         -fwarn-overlapping-patterns
-                         -fwarn-incomplete-record-updates
-                         -fwarn-missing-signatures
-                         -fwarn-monomorphism-restriction
-                         -fwarn-orphans
+    ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+                         
   
   if flag(profile)
     ghc-options:         -prof -fprof-auto -auto-all -rts-opts
@@ -143,6 +140,7 @@ executable Viewer
   build-depends:         base
                        , either
                        , control-bool
+                       , monad-extras
                        , async
                        , vector
                        , text

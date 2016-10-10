@@ -36,7 +36,7 @@ module Graphics.WaveFront.Foreign where
 -- import Foreign.Storable
 -- import qualified Foreign.C as C
 
-import           Graphics.WaveFront.Types
+import Graphics.WaveFront.Types
 -- import qualified Graphics.WaveFront.Parse as Parse
 
 
