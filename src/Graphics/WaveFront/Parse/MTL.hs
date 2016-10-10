@@ -39,11 +39,10 @@ module Graphics.WaveFront.Parse.MTL (
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
--- import           Data.Int    (Int64)
 -- import qualified Data.Map  as M
 -- import qualified Data.Set  as S
--- import qualified Data.Text as T
 -- import qualified Data.Vector as V
+import Data.Text (Text)
 
 import qualified Data.Attoparsec.Text as Atto
 
@@ -62,19 +61,19 @@ import Graphics.WaveFront.Types hiding (ambient, diffuse, specular)
 -- MTL parsing -----------------------------------------------------------------------------------------------------------------------------
 
 -- | Produces a list of MTL tokens, with associated line numbers and comments
-mtl :: Atto.Parser (SimpleMTL)
-mtl = cutToTheChase *> Atto.sepBy row lineSeparator -- <* Atto.endOfInput
+mtl :: (Fractional f) => Atto.Parser (MTL f Text [])
+mtl = Atto.sepBy row lineSeparator -- <* Atto.endOfInput
 
 
 -- | Parses a single MTL row.
-row :: Atto.Parser (SimpleMTLToken)
+row :: (Fractional f) => Atto.Parser (MTLToken f Text)
 row = token <* ignore comment
 
 --------------------------------------------------------------------------------------------------------------------------------------------
 
 -- | Parse an MTL token
 -- TODO: How to deal with common prefix (Ka, Kd, Ks) (backtrack?)
-token :: Atto.Parser (SimpleMTLToken)
+token :: (Fractional f) => Atto.Parser (MTLToken f Text)
 token = (Atto.string "Ka"     *> ambient)     <|>
         (Atto.string "Kd"     *> diffuse)     <|>
         (Atto.string "Ks"     *> specular)    <|>
@@ -91,50 +90,50 @@ token = (Atto.string "Ka"     *> ambient)     <|>
 -- TODO: Expose these parsers for testing purposes (?)
 
 -- |
-ambient :: Atto.Parser (SimpleMTLToken)
+ambient :: (Fractional f) => Atto.Parser (MTLToken f s)
 ambient = Ambient <$> colour
 
 
 -- |
-diffuse :: Atto.Parser (SimpleMTLToken)
+diffuse :: (Fractional f) => Atto.Parser (MTLToken f s)
 diffuse = Diffuse <$> colour
 
 
 -- |
-specular :: Atto.Parser (SimpleMTLToken)
+specular :: (Fractional f) => Atto.Parser (MTLToken f s)
 specular = Specular <$> colour
 
 
 -- |
-specExp :: Atto.Parser (SimpleMTLToken)
+specExp :: (Fractional f) => Atto.Parser (MTLToken f s)
 specExp = space *> (SpecularExponent <$> Atto.rational)
 
 
 -- |
-illum :: Atto.Parser (SimpleMTLToken)
+illum :: Atto.Parser (MTLToken f s)
 illum = space *> (Illum <$> clamped 0 10)
 
 
 -- |
-refraction :: Atto.Parser (SimpleMTLToken)
+refraction :: (Fractional f) => Atto.Parser (MTLToken f s)
 refraction = space *> (Refraction <$> Atto.rational)
 
 
 -- |
-dissolve :: Atto.Parser (SimpleMTLToken)
+dissolve :: (Fractional f) => Atto.Parser (MTLToken f s)
 dissolve = space *> (Dissolve <$> Atto.rational)
 
 
 -- |
-mapDiffuse :: Atto.Parser (SimpleMTLToken)
-mapDiffuse = space *> (MapDiffuse  <$> name)
+mapDiffuse :: Atto.Parser (MTLToken f Text)
+mapDiffuse = space *> (MapDiffuse <$> name)
 
 
 -- |
-mapAmbient :: Atto.Parser (SimpleMTLToken)
-mapAmbient = space *> (MapAmbient  <$> name)
+mapAmbient :: Atto.Parser (MTLToken f Text)
+mapAmbient = space *> (MapAmbient <$> name)
 
 
 -- |
-newMaterial :: Atto.Parser (SimpleMTLToken)
+newMaterial :: Atto.Parser (MTLToken f Text)
 newMaterial = space *> (NewMaterial <$> name)

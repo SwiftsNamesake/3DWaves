@@ -31,7 +31,7 @@ module Graphics.WaveFront () where -- TODO: Fill this in
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
-import           Graphics.WaveFront.Types
-import qualified Graphics.WaveFront.Parse        as Parse
-import qualified Graphics.WaveFront.Parse.Common as Parse
-import           Graphics.WaveFront.Model
+-- import           Graphics.WaveFront.Types
+-- import qualified Graphics.WaveFront.Parse        as Parse
+-- import qualified Graphics.WaveFront.Parse.Common as Parse
+-- import           Graphics.WaveFront.Model

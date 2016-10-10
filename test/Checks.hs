@@ -1,5 +1,5 @@
 --
--- Southpaw.Wavefront.Checks
+-- Graphics.Wavefront.Checks
 -- Executable containing checks and tests for the modules in this package
 --
 -- Jonatan H Sundqvist
@@ -15,7 +15,7 @@
 
 
 
-module Southpaw.WaveFront.Checks where
+module Graphics.WaveFront.Checks where
 
 
 
@@ -29,15 +29,17 @@ import System.IO (hFlush, stdout)
 
 import Control.Monad (forM_, when)
 
-import Southpaw.WaveFront.Parsers (MTL, OBJ, OBJNoParse(..), MTLNoParse(..), MTLToken(..))
-import Southpaw.WaveFront.Load    (loadOBJ, loadMTL)
+import Graphics.WaveFront.Parsers (MTL, OBJ, OBJNoParse(..), MTLNoParse(..), MTLToken(..))
+import Graphics.WaveFront.Load    (loadOBJ, loadMTL)
 
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- Functions (IO)
 --------------------------------------------------------------------------------------------------------------------------------------------
--- IO utilities -----------------------------------------------------------------------------------
+
+-- IO utilities ----------------------------------------------------------------------------------------------------------------------------
+
 -- | 
 promptContinue :: String -> IO ()
 promptContinue prompt = do

@@ -7,7 +7,7 @@
 -- Stability   : experimental|stable
 -- Portability : POSIX (not sure)
 
--- TODO | - 
+-- TODO | - Fully polymorphic (even in the string and list types) (?)
 --        - 
 
 -- SPEC | -
@@ -40,13 +40,11 @@ module Graphics.WaveFront.Parse.OBJ (
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
-import           Data.Int    (Int64)
--- import qualified Data.Map  as M
--- import qualified Data.Text as T
+import Data.Text (Text)
 -- import qualified Data.Vector as V
-import qualified Data.Set  as S
+import qualified Data.Set as S
 
-import qualified Data.Attoparsec.Text       as Atto
+import qualified Data.Attoparsec.Text as Atto
 
 import Control.Applicative ((<$>), (<*>), (<*), (*>), (<|>))
 
@@ -64,8 +62,8 @@ import Graphics.WaveFront.Types hiding (texture)
 -- OBJ parsing -----------------------------------------------------------------------------------------------------------------------------
 
 -- | This function creates an OBJToken or error for each line in the input data
-obj :: Atto.Parser (SimpleOBJ)
-obj = cutToTheChase *> Atto.sepBy row lineSeparator -- <* Atto.endOfInput
+obj :: (Fractional f, Integral i) => Atto.Parser (OBJ f Text i [])
+obj = Atto.sepBy row lineSeparator -- <* Atto.endOfInput
 
 
 -- | Parses a token given a single valid OBJ row, or an error value if the input is malformed.
@@ -78,13 +76,13 @@ obj = cutToTheChase *> Atto.sepBy row lineSeparator -- <* Atto.endOfInput
 --       Type for specific attribute that failed to parse (eg. "f 1/2 0/p 1.5/x")
 --
 -- TODO: Use ListLike or Monoid (or maybe Indexable, since that's the real requirement) (?)
-row :: Atto.Parser (SimpleOBJToken)
+row :: (Fractional f, Integral i) => Atto.Parser (OBJToken f Text i [])
 row = token <* ignore comment -- TODO: Let the separator handle comments (?)
 
 
 -- |
 -- Parses an OBJ token
-token :: Atto.Parser (SimpleOBJToken)
+token :: (Fractional f, Integral i) => Atto.Parser (OBJToken f Text i [])
 token = (Atto.string "f"  *> face)    <|>
         (Atto.string "l"  *> line)    <|>
         -- TODO: How to deal with common prefix (v, vn, vt) (backtrack?) (doesn't seem to be a problem)
@@ -102,52 +100,52 @@ token = (Atto.string "f"  *> face)    <|>
 
 
 -- |
-face :: Atto.Parser (SimpleOBJToken)
+face :: Integral i => Atto.Parser (OBJToken f Text i [])
 face = OBJFace <$> atleast 3 (space *> vertexIndices)
 
 
 -- |
-line :: Atto.Parser (SimpleOBJToken)
+line :: Integral i => Atto.Parser (OBJToken f Text i m)
 line = Line <$> (space *> Atto.decimal) <*> (space *> Atto.decimal)
 
 
 -- |
-normal :: Atto.Parser (SimpleOBJToken)
+normal :: (Fractional f) => Atto.Parser (OBJToken f Text i m)
 normal = OBJNormal <$> point3D
 
 
 -- |
-texture :: Atto.Parser (SimpleOBJToken)
+texture :: (Fractional f) => Atto.Parser (OBJToken f Text i m)
 texture = OBJTexture <$> point2D
 
 
 -- |
-vertex :: Atto.Parser (SimpleOBJToken)
+vertex :: (Fractional f) =>  Atto.Parser (OBJToken f s i m)
 vertex  = OBJVertex <$> point3D
 
 
 -- |
-object :: Atto.Parser (SimpleOBJToken)
+object :: Atto.Parser (OBJToken f Text i m)
 object = Object . S.fromList <$> atleast 1 (space *> name)
 
 
 -- |
-group :: Atto.Parser (SimpleOBJToken)
+group :: Atto.Parser (OBJToken f Text i m)
 group = Group . S.fromList <$> atleast 1 (space *> name)
 
 
 -- |
-smooth :: Atto.Parser (SimpleOBJToken)
+smooth :: Atto.Parser (OBJToken f s i m)
 smooth = SmoothShading <$> (space *> toggle)
 
 
 -- |
-lib :: Atto.Parser (SimpleOBJToken)
+lib :: Atto.Parser (OBJToken f Text i m)
 lib = LibMTL <$> (space *> name)
 
 
 -- |
-use :: Atto.Parser (SimpleOBJToken)
+use :: Atto.Parser (OBJToken f Text i m)
 use = UseMTL <$> (space *> name)
 
 
@@ -156,7 +154,7 @@ use = UseMTL <$> (space *> name)
 -- TODO: PLEASE FIX THIS, FUTURE SELF
 -- f Int[/((Int[/Int])|(/Int))]
 -- VertexIndices ivert inorm itex
-vertexIndices :: Atto.Parser (VertexIndices Int64)
+vertexIndices :: Integral i => Atto.Parser (VertexIndices i)
 vertexIndices = VertexIndices <$>
                   Atto.decimal <*>
                   ((Atto.char '/' *> (Just <$> Atto.decimal   <|> pure Nothing)) <|> pure Nothing) <*>

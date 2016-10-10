@@ -5,6 +5,7 @@ packages:
 - location: C:/Users/Jonatan/Desktop/Haskell/modules/Michelangelo
 - location: C:/Users/Jonatan/Desktop/Haskell/modules/Leibniz
 - location: C:/Users/Jonatan/Desktop/Haskell/modules/Interactive
+- location: C:/Users/Jonatan/Desktop/Haskell/modules/reactive-glfw
 - location:
     git: https://github.com/feuerbach/ansi-terminal.git
     commit: bf4995c7dc3ab3caa4c7051a7f1988f3a457faea

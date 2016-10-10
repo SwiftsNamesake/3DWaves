@@ -8,7 +8,7 @@
 -- Portability : POSIX (not sure)
 --
 
--- TODO | - 
+-- TODO | - Single-pass (eg. consume all tokens only once) for additional performance (?)
 --        - 
 
 -- SPEC | -
@@ -21,10 +21,10 @@
 --------------------------------------------------------------------------------------------------------------------------------------------
 {-# LANGUAGE UnicodeSyntax     #-}
 {-# LANGUAGE TupleSections     #-}
-{-# LANGUAGE OverloadedStrings #-}
---{-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE OverloadedStrings #-}
+--{-# LANGUAGE OverloadedLists   #-}
 
 
 
@@ -47,20 +47,20 @@ module Graphics.WaveFront.Model (
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
 import qualified Data.Vector as V
-import           Data.Vector ((!?))
+import           Data.Vector (Vector, (!?))
 
-import qualified Data.Text   as T
-import qualified Data.Map    as M
-import qualified Data.Set    as S
+import           Data.Text (Text)
+import qualified Data.Map  as M
+import           Data.Map (Map)
+import qualified Data.Set  as S
+import           Data.Set (Set)
 
 import Data.List   (groupBy)
 import Data.Maybe  (listToMaybe, catMaybes)
 
-import Data.Int (Int64)
-
 import Linear (V3(..))
 
-import Control.Lens ((^.), (%~), _3)
+import Control.Lens ((^.), (.~), (%~), (&), _1, _2, _3)
 
 import Cartesian.Core (BoundingBox(..), fromExtents, x, y, z)
 
@@ -76,18 +76,25 @@ import Graphics.WaveFront.Lenses
 --------------------------------------------------------------------------------------------------------------------------------------------
 
 -- |
+-- TODO | - Factor out and make generic
 pairwise :: (a -> a -> b) -> [a] -> [b]
 pairwise f xs = zipWith f xs (drop 1 xs)
 
+
+-- |
+maybeToEither :: a -> Maybe b -> Either a b
+maybeToEither _ (Just b)  = Right b
+maybeToEither a (Nothing) = Left a
+
 -- Parser output churners (OBJ) ------------------------------------------------------------------------------------------------------------
 
--- TODO: Move to separate module (eg. WaveFront.Model)
+-- TODO | - Move to separate module (eg. WaveFront.Model)
 
 -- | Creates a mapping between group names and the corresponding bounds ([lower, upper)). Invalid
 --   tokens are simply discarded by this function.
 --
--- TODO: Figure out how to deal with multiple group names (eg. "g mesh1 nose head")
-groupsOf :: [SimpleOBJToken] -> M.Map (S.Set T.Text) (Int64, Int64)
+-- TODO | - Figure out how to deal with multiple group names (eg. "g mesh1 nose head")
+groupsOf :: (Ord s, Integral i) => [OBJToken f s i m] -> Map (Set s) (i, i)
 groupsOf = buildIndexMapWith . filter notObject
   where
     notObject (Object _) = False
@@ -95,7 +102,7 @@ groupsOf = buildIndexMapWith . filter notObject
 
 
 -- |
-objectsOf :: [SimpleOBJToken] -> M.Map (S.Set T.Text) (Int64, Int64)
+objectsOf :: (Ord s, Integral i) => [OBJToken f s i m] -> Map (Set s) (i, i)
 objectsOf = buildIndexMapWith . filter notGroup
   where
     notGroup (Group _) = False
@@ -104,10 +111,10 @@ objectsOf = buildIndexMapWith . filter notGroup
 
 -- | Creates a mapping between names (of groups or objects) to face indices
 --
--- TODO: Refactor, simplify
--- TODO: What happens if the same group or object appears multiple times (is that possible?)
+-- TODO | - Refactor, simplify
+--        - What happens if the same group or object appears multiple times (is that possible?)
 --
-buildIndexMapWith :: [SimpleOBJToken] -> M.Map (S.Set T.Text) (Int64, Int64)
+buildIndexMapWith :: (Ord s, Integral i) => [OBJToken f s i m] -> Map (Set s) (i, i)
 buildIndexMapWith tokens = M.fromList . pairwise zipIndices . reverse . addLastIndex $ foldl update (0, []) $ tokens
   where
     addLastIndex (nfaces, groups') = (S.empty, nfaces):groups'
@@ -122,35 +129,52 @@ buildIndexMapWith tokens = M.fromList . pairwise zipIndices . reverse . addLastI
 -- | Filters out faces from a stream of OBJTokens and attaches the currently selected material,
 --   as defined by the most recent LibMTL and UseMTL tokens.
 --
--- TODO: Don't use foldl (?)
--- TODO: Deal with errors (eg. missing materials)
--- TODO: Improve naming scheme (lots of primes)
--- TODO: Default material, take 'error-handling' function (?)
--- TODO: Can vertices in the same face have different materials (?)
-facesOf :: [SimpleOBJToken] -> SimpleMTLTable -> [Either String SimpleFace]
-facesOf tokens table = reverse . (^._3) . foldl update ("", "", []) $ tokens
+-- TODO | - Don't use foldl (?)
+--        - Improve naming scheme (lots of primes)
+--        - Default material, take 'error-handling' function (?)
+--        - Can vertices in the same face have different materials (?)
+facesOf :: Ord s => [OBJToken f s i m] -> MTLTable f s -> [Either String (Face f s i m)]
+facesOf tokens materials' = reverse . (^._3) . foldl update (Nothing, Nothing, []) $ tokens
   where 
-    retrieve lib mat       = M.lookup lib table >>= M.lookup mat
-    createFace lib mat ind = case retrieve lib mat of
-                               Nothing -> Left  $ concat ["No such material: ", T.unpack lib, ".", T.unpack mat]
-                               Just m  -> Right $ Face { fIndices=ind, fMaterial=m }
-    update (lib', material', faces') token = case token of
-                                               OBJFace ind -> (lib', material', createFace lib' material' ind : faces')
-                                               LibMTL  lib -> (lib,  material', faces')
-                                               UseMTL  mat -> (lib', mat,       faces')
-                                               _           -> (lib', material', faces')
+    -- TODO: Keep refactoring...
+    update acc@(Just libName, Just matName, faces') (OBJFace indices') = acc & _3 .~ (createFace materials' libName matName indices' : faces')
+    update acc@(Nothing,      _,            faces') (OBJFace _)        = acc & _3 .~ (Left "No library selected for face" : faces')
+    update acc@(_,            Nothing,      faces') (OBJFace _)        = acc & _3 .~ (Left "No material selected for face" : faces')
+    update acc                                      (LibMTL  libName)  = acc & _1 .~ (Just libName)
+    update acc                                      (UseMTL  matName)  = acc & _2 .~ (Just matName)
+    update acc                                       _                 = acc
+
+
+-- |
+createFace :: Ord s => MTLTable f s -> s -> s -> m (VertexIndices i) -> Either String (Face f s i m)
+createFace materials' libName matName indices' = do
+  material' <- lookupMaterial materials' libName matName
+  Right $ Face { fIndices=indices', fMaterial=material' }
+
+
+-- |
+-- TODO: Specify missing material or library name (would require additional constraints on 's')
+-- TODO: Refactor
+lookupMaterial :: Ord s => MTLTable f s -> s -> s -> Either String (Material f s)
+lookupMaterial materials' libName matName = do
+  library <- maybeToEither "No such library" (M.lookup libName materials')
+  maybeToEither "No such material" (M.lookup matName library)
 
 -- Parser output churners (MTL) ------------------------------------------------------------------------------------------------------------
 
--- | Constructs a map between names and materials. Partially or wholly undefined materials
---   are mapped to a string detailing the error (eg. Left "missing specular").
+-- |
+-- TODO | - Refactor, simplify
+createMTLTable :: Ord s => [(s, [MTLToken f s])] -> Either String (MTLTable f s)
+createMTLTable = fmap M.fromList . mapM (\(name, tokens) -> (name,) <$> materialsOf tokens)
+
+
+-- | Constructs a map between names and materials. Incomplete material definitions
+--   result in an error (Left ...).
 --
 -- TODO | - Debug information (eg. attributes without an associated material)
 --        - Pass in error function (would allow for more flexible error handling) (?)
---        - Filter out parser failures (?)
 --        - Deal with duplicated attributes (probably won't crop up in any real situations)
---        - Factor single material function
-materialsOf :: Ord s => [MTLToken f s] -> Either String (M.Map s (Material f s))
+materialsOf :: Ord s => [MTLToken f s] -> Either String (Map s (Material f s))
 materialsOf = fmap M.fromList . mapM createMaterial . partitionMaterials
 
 
@@ -162,10 +186,9 @@ createMaterial  attrs                   = Left  $ "Free-floating attributes"
 
 
 -- |
--- TODO: Rename (eg. groupMaterials) (?)
--- ((not . isnew) .) . flip const
+-- TODO | - Rename (eg. groupMaterials) (?)
 partitionMaterials :: [MTLToken f s] -> [[MTLToken f s]]
-partitionMaterials = groupBy (\_ b -> isNewMaterial b)
+partitionMaterials = groupBy (\_ b -> not $ isNewMaterial b)
   where
     isNewMaterial (NewMaterial _) = True
     isNewMaterial _               = False
@@ -182,41 +205,25 @@ fromAttributes attrs = case colours' of
 
 
 -- | Tries to extract a diffuse colour, a specular colour, and an ambient colour from a list of MTL tokens
--- TODO: Should we really require all three colour types (?)
--- TODO: Rename (?)
+-- TODO | - Should we really require all three colour types (?)
+--        - Rename (?)
 materialColours :: [MTLToken f s] -> Maybe (Colour f, Colour f, Colour f)
 materialColours attrs = (,,) <$>
                           listToMaybe [ c | (Diffuse  c) <- attrs ] <*>
                           listToMaybe [ c | (Specular c) <- attrs ] <*>
                           listToMaybe [ c | (Ambient  c) <- attrs ]
 
-
--- |
--- TODO: Debug information (eg. how many invalid materials were filtered out)
--- TODO: Refactor, simplify
-createMTLTable :: [(T.Text, [SimpleMTLToken])] -> Either String (SimpleMTLTable)
-createMTLTable mtls = M.fromList <$> mapM (\ (name, tokens) -> (name,) <$> materialsOf tokens) mtls
-
 -- API functions ---------------------------------------------------------------------------------------------------------------------------
 
--- |
--- TODO: Use map for materials (?)
--- TODO: How to retrieve MTL data
--- TODO: How to deal with errors, including no-parse, index errors, etc. (use applicative?)
--- TODO: Performance, how are 'copies' of coordinates handled (?)
--- TODO: Performance, one pass (with a fold perhaps)
--- TODO: Use a more efficient data structure (especially w.r.t indexing; cf. Vector)
--- TODO: Consider preserving the indices (rather than generating a list of duplicated vertices).
---       This would preserve space (in cases where vertices are often re-used), as well as being
---       very compatible with index buffers on graphics cards.
+-- | Constructs a model from a stream of OBJ tokens, a materials table and an optional path to root of the model (used for textures, etc.)
 --
--- TODO: Keep map of materials and list of textures in final output (inside model or as items in a tuple) (?)
+-- TODO | - Performance, how are 'copies' of coordinates handled (?)
+--        - Performance, one pass (with a fold perhaps)
 --
 -- I never knew pattern matching in list comprehensions could be used to filter by constructor
--- let rows = parseOBJ data in ([ v | @v(Vertex {}) <- rows], [ v | @v(Vertex {}) <- rows])
-createModel :: SimpleOBJ -> SimpleMTLTable -> Maybe FilePath -> Either String (SimpleModel) -- Either String SimpleModel
+createModel :: (Ord s, Integral i) => OBJ f s i [] -> MTLTable f s -> Maybe FilePath -> Either String (Model f s i Vector)
 createModel tokens materials root = do
-    faces' <- sequence $ facesOf tokens materials -- TODO: Don't just filter out the degenerate faces
+    faces' <- sequence $ facesOf tokens materials
     return $ Model { fVertices  = V.fromList [ vec | OBJVertex  vec <- tokens ],
                      fNormals   = V.fromList [ vec | OBJNormal  vec <- tokens ],
                      fTexcoords = V.fromList [ vec | OBJTexture vec <- tokens ],
@@ -226,17 +233,18 @@ createModel tokens materials root = do
                      fMaterials = materials,
                      fRoot      = root }
   where
-    packFace :: Face Double T.Text Int64 [] -> Face Double T.Text Int64 V.Vector
-    packFace face@(Face { fIndices }) = face { fIndices=V.fromList fIndices } -- indices %~ (_) -- TODO: Type-changing lenses
+    packFace :: Face f s i [] -> Face f s i Vector
+    packFace face@Face{fIndices} = face { fIndices=V.fromList fIndices } -- indices %~ (_) -- TODO: Type-changing lenses
 
-    packFaces :: [] (Face Double T.Text Int64 []) -> V.Vector (Face Double T.Text Int64 V.Vector)
+    packFaces :: [] (Face f s i []) -> Vector (Face f s i Vector)
     packFaces = V.fromList . map (packFace . tessellate)
 
 
--- TODO: Specialise to [[Face]] (?)
--- TODO: Check vertex count (has to be atleast three)
--- TODO: Better names (?)
-tessellate :: SimpleFace -> SimpleFace
+-- |
+-- TODO | - Specialise to [[Face]] (?)
+--        - Check vertex count (has to be atleast three)
+--        - Better names (?)
+tessellate :: Face f s i [] -> Face f s i []
 tessellate = indices %~ triangles
   where
     triangles []       = []
@@ -244,13 +252,12 @@ tessellate = indices %~ triangles
 
 
 -- |
--- TODO: Deal with empty vertex lists (?)
--- TODO: Refactor
--- boundingbox :: (RealFloat n, Ord n) => Model -> BoundingBox (Vector3D n)
--- TODO: Folding over applicative (fold in parallel)
--- TODO: Make sure the order is right
+-- TODO | - Deal with empty vertex lists (?)
+--        - Refactor
+--        - Folding over applicative (fold in parallel)
+--        - Make sure the order is right
 bounds :: (Num f, Ord f, Foldable m, HasVertices (Model f s i m) (m (V3 f))) => Model f s i m -> BoundingBox (V3 f)
-bounds model = fromExtents $ (axisBounds $ model^.vertices) <$> V3 x y z
+bounds model = fromExtents $ axisBounds (model^.vertices) <$> V3 x y z
   where
     -- TODO: Factor out 'minmax'
     minmaxBy :: (Ord o, Num o, Foldable m) => (a -> o) -> m a -> (o, o)
@@ -265,13 +272,13 @@ bounds model = fromExtents $ (axisBounds $ model^.vertices) <$> V3 x y z
 --------------------------------------------------------------------------------------------------------------------------------------------
 
 -- |
--- TODO: Factor out the buffer-building logic
-fromIndices :: V.Vector (v Double) -> (VertexIndices Int64 ->  Int64) -> V.Vector (Face Double T.Text Int64 V.Vector) -> V.Vector (Maybe (v Double))
+-- TODO | - Factor out the buffer-building logic
+fromIndices :: Integral i => V.Vector (v Double) -> (VertexIndices i ->  i) -> V.Vector (Face Double Text i V.Vector) -> V.Vector (Maybe (v Double))
 fromIndices data' choose faces' = V.concatMap (fromFaceIndices data' choose) faces'
 
 
 -- |
-fromFaceIndices :: V.Vector (v Double) -> (VertexIndices Int64 ->  Int64) -> Face Double T.Text Int64 V.Vector -> V.Vector (Maybe (v Double))
+fromFaceIndices :: Integral i => V.Vector (v Double) -> (VertexIndices i ->  i) -> Face Double Text i V.Vector -> V.Vector (Maybe (v Double))
 fromFaceIndices data' choose face' = V.map ((data' !?) . fromIntegral . subtract 1 . choose) . (^.indices) $ face'
 
 
@@ -283,10 +290,9 @@ diffuseColours faces' = V.concatMap (\f -> V.replicate (V.length $ f^.indices) (
 
 -- |
 hasTextures :: Ord s => Model f s i m -> Bool
-hasTextures =  not . S.null . textures -- (/= Nothing)
+hasTextures =  not . S.null . textures
 
 
 -- | All texture names as a list
--- TODO: Wrap in Maybe (instead of empty list) (?)
 textures :: Ord s => Model f s i m -> S.Set s
 textures = S.fromList . catMaybes . map (^.texture) . concatMap M.elems . M.elems . (^.materials)

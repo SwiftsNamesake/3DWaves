@@ -35,8 +35,10 @@ module Graphics.WaveFront.Load where
 --------------------------------------------------------------------------------------------------------------------------------------------
 import System.FilePath (splitFileName, takeDirectory, (</>))
 
+import           Data.Text (Text)
 import qualified Data.Text    as T
 import qualified Data.Text.IO as T
+import           Data.Vector (Vector)
 
 import Control.Applicative ((<$>))
 import Control.Monad.Trans.Either
@@ -60,22 +62,20 @@ import           Graphics.WaveFront.Model (createMTLTable, createModel)
 -- |
 -- TODO | - Use bytestrings (?)
 --        - Deal with IO and parsing errors
-obj :: String -> IO (Either String (SimpleOBJ))
+obj :: (Fractional f, Integral i) => String -> IO (Either String (OBJ f Text i []))
 obj fn = runEitherT $ do
   lift $ putStrLn $ "Loading obj file: " ++ fn
-  EitherT $ Atto.parseOnly (parseWholeFile) <$> T.readFile fn
-  where
-    parseWholeFile = Parse.obj <* Parse.cutToTheChase <* Atto.endOfInput
+  EitherT $ Atto.parseOnly (Parse.wholeFile Parse.obj) <$> T.readFile fn
 
 
 -- |
--- TODO | -  Use bytestrings (?)
---        -  Merge OBJ and MTL parsers (and plug in format-specific code as needed) (?)
---        -  Deal with IO and parsing errors
-mtl :: String -> IO (Either String (SimpleMTL))
+-- TODO | - Use bytestrings (?)
+--        - Merge OBJ and MTL parsers (and plug in format-specific code as needed) (?)
+--        - Deal with IO and parsing errors
+mtl :: (Fractional f) => String -> IO (Either String (MTL f Text []))
 mtl fn = do
   putStrLn $ "Loading mtl file: " ++ fn
-  Atto.parseOnly (Parse.mtl <* Parse.cutToTheChase <* Atto.endOfInput) <$> T.readFile fn
+  Atto.parseOnly (Parse.wholeFile Parse.mtl) <$> T.readFile fn
 
 
 -- |
@@ -83,18 +83,18 @@ mtl fn = do
 --        - Refactor, simplify
 --        - Improve path handling (cf. '</>')
 --        - Graceful error handling
-materials :: [String] -> IO (Either String (SimpleMTLTable))
+materials :: (Fractional f) => [FilePath] -> IO (Either String (MTLTable f Text))
 materials fns = runEitherT $ do
   tokens <- mapM (EitherT . mtl) fns
   EitherT . return $ createTableFromMTLs tokens
   where
-    createTableFromMTLs :: [[SimpleMTLToken]] -> Either String (SimpleMTLTable)
+    createTableFromMTLs :: [[MTLToken f Text]] -> Either String (MTLTable f Text)
     createTableFromMTLs = createMTLTable . zip (map (T.pack . snd . splitFileName) fns)
 
 
 -- | Loads an OBJ model from file, including associated materials
 -- TODO | - Graceful error handling
-model :: String -> IO (Either String (SimpleModel))
+model :: (Fractional f, Integral i) => FilePath -> IO (Either String (Model f Text i Vector))
 model fn = runEitherT $ do
   obj       <- EitherT $ obj fn
   materials <- EitherT $ materials [ fst (splitFileName fn) </> T.unpack name | LibMTL name <- obj ]

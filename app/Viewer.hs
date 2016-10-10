@@ -42,10 +42,10 @@ module Main where
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
 import qualified Data.Vector as V
-import           Data.Vector ((!?))
-import           Data.Int    (Int64)
+import           Data.Vector (Vector, (!?))
 
 import qualified Data.Text as T
+import           Data.Text (Text)
 import           Data.Maybe    (listToMaybe)
 import           Data.Either   (rights, lefts)
 import           Data.Either.Combinators
@@ -101,6 +101,8 @@ import Cartesian.Core (centre, x, y, z, size, corner, width, height, depth)
 
 import Leibniz.Constants    (π)
 import Leibniz.Trigonometry (torad)
+
+import Reactive.Banana.GLFW.Listeners
 
 import Graphics.WaveFront.Types  as WF
 import Graphics.WaveFront.Model  as WF
@@ -230,7 +232,7 @@ defaultUniforms program' = do
 -- Scenes ----------------------------------------------------------------------------------------------------------------------------------
 
 -- |
-createTexturedMesh :: Program -> WF.SimpleModel -> IO (Either String (Mesh Double Int))
+createTexturedMesh :: Program -> (Model Double Text Int Vector) -> IO (Either String (Mesh Double Int))
 createTexturedMesh program' model = runEitherT $ do
   attributes' <- sequence [attr program' ("aVertexPosition", vs),
                            -- attr program' ("aVertexColor",    cs),
@@ -297,7 +299,7 @@ timeit action begin done = do
 
 
 -- |
-loadWithName :: FilePath -> IO (String, Either String (SimpleModel))
+loadWithName :: FilePath -> IO (String, Either String (Model Double Text Int Vector))
 loadWithName fn = timeit load begin done
   where
     name       = takeBaseName fn
@@ -307,7 +309,7 @@ loadWithName fn = timeit load begin done
 
 
 -- |
-loadModels :: [FilePath] -> IO (M.Map String (Either String (SimpleModel)))
+loadModels :: [FilePath] -> IO (M.Map String (Either String (Model Double Text Int Vector)))
 loadModels fns = M.fromList <$> mapConcurrently (loadWithName) fns
 
 
@@ -332,80 +334,6 @@ runCommand cmd = do
   return ()
 
 -- FRP -------------------------------------------------------------------------------------------------------------------------------------
-
--- |
--- fromAddHandler addHandler
--- registerCallback :: setCallback -> pack -> unpack -> GLFW.Window -> callback -> IO (IO ())
-registerCallback setCallback pack unpack onevent = do
-  (addHandler, fire) <- newAddHandler
-  unregister <- register addHandler (unpack onevent)
-  setCallback (Just $ pack fire)
-  return unregister
-
-
--- |
--- registerMouseButtonHandler :: GLFW.Window -> GLFW.MouseButtonCallback -> IO (IO ())
-registerMouseButtonHandler window' = registerCallback
-                                       (GLFW.setMouseButtonCallback window')
-                                       (\ f a b c d -> f (a,b,c,d))
-                                       (\f (a,b,c,d) -> f a b c d)
-
-
--- |
--- registerKeyCallback :: GLFW.Window -> GLFW.KeyCallback -> IO (IO ())
-registerKeyCallback window' = registerCallback
-                                (GLFW.setKeyCallback window')
-                                (\f a b c d e   -> f (a,b,c,d,e))
-                                (\f (a,b,c,d,e) -> f a b c d e)
-
-
--- |
--- registerCursorCallback :: 
-registerCursorCallback window' = registerCallback
-                                   (GLFW.setCursorPosCallback window')
-                                   (\f win x y       -> f (win, V2 x y))
-                                   (\f (win, V2 x y) -> f  win (V2 x y))
-
-
--- |
--- registerResizeCallback :: 
-registerResizeCallback window' = registerCallback
-                                   (GLFW.setWindowSizeCallback window')
-                                   (\f win cx cy       -> f (win, V2 cx cy))
-                                   (\f (win, V2 cx cy) -> f  win (V2 cx cy))
-
-
--- |
--- registerDropCallback :: 
-registerDropCallback window' = registerCallback
-                                 (GLFW.setDropCallback window')
-                                 (\f a b   -> f (a,b))
-                                 (\f (a,b) -> f a b)
-
-
--- |
--- registerCharCallback :: 
-registerCharCallback window' = registerCallback
-                                 (GLFW.setCharCallback window')
-                                 (\f a b   -> f (a,b))
-                                 (\f (a,b) -> f a b)
-
-
--- |
--- registerErrorCallback ::
-registerErrorCallback = registerCallback (GLFW.setErrorCallback) (\f a b   -> f (a,b)) (\f (a,b) -> f a b)
-
-
--- |
--- registerTimerCallback :: 
--- registerTimerCallback = registerCallback
---                           GLFW.addTimerCallback
---                           (\f a b c d e   -> f (a,b,c,d,e))
---                           (\f (a,b,c,d,e) -> f a b c d e)
-
-
--- getClipboardString :: Window -> IO (Maybe String) Source #
--- setClipboardString :: Window -> String -> IO ()
 
 -- Data ------------------------------------------------------------------------------------------------------------------------------------
 
@@ -452,7 +380,7 @@ main = void . runEitherT $ do
     return ()
   
   lift prepareGraphics
-  shader' <- EitherT $ mapLeft concat <$> (Shader.createProgram Shader.textured)
+  shader' <- EitherT (Shader.createProgram Shader.textured)
   meshes' <- lift $ loadMeshes shader' ["assets/models/hombre.obj", "assets/models/minecraft1.obj", "assets/models/king.obj", "assets/models/villa.obj"]
   let meshList = map snd . M.toList . (M.mapMaybe (either (const Nothing) Just)) $ meshes'
   lift $ do
