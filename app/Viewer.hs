@@ -46,7 +46,7 @@ import           Data.Vector (Vector, (!?))
 
 import qualified Data.Text as T
 import           Data.Text (Text)
-import           Data.Maybe    (listToMaybe)
+import           Data.Maybe    (listToMaybe, fromMaybe)
 import           Data.Either   (rights, lefts)
 import           Data.Either.Combinators
 import qualified Data.Map as M
@@ -78,13 +78,13 @@ import GHC.Stack
 import Foreign.C.Types
 import Foreign.Storable (Storable)
 
-import Graphics.UI.GLFW as GLFW (MouseButton(..), MouseButtonState(..))
 
 import           Graphics.Rendering.OpenGL as GL hiding (perspective, ortho, rotate, translate, scale, texture)
 import           Graphics.Rendering.OpenGL.GL.Shaders.ShaderObjects
 import           Graphics.GLUtil hiding        (loadShaderProgram)
 import           Graphics.GLUtil.JuicyTextures (readTexture)
 
+import           Graphics.UI.GLFW (MouseButton(..), MouseButtonState(..))
 import qualified Graphics.UI.GLFW as GLFW
 
 import Reactive.Banana
@@ -232,14 +232,14 @@ defaultUniforms program' = do
 -- Scenes ----------------------------------------------------------------------------------------------------------------------------------
 
 -- |
-createTexturedMesh :: Program -> (Model Double Text Int Vector) -> IO (Either String (Mesh Double Int))
-createTexturedMesh program' model = runEitherT $ do
+createMesh :: Program -> (Model Double Text Int Vector) -> IO (Either String (Mesh Double Int))
+createMesh program' model = runEitherT $ do
   attributes' <- sequence [attr program' ("aVertexPosition", vs),
-                           -- attr program' ("aVertexColor",    cs),
+                           attr program' ("aVertexColor",    cs),
                            attr program' ("aTexCoord",       ts)]
   
   -- TODO: This could fail
-  textures' <- mapM (EitherT . readTexture . texturePath . T.unpack) (S.toList $ WF.textures model)
+  texture'  <- fromMaybe white . listToMaybe $ mapM (EitherT . readTexture . texturePath . T.unpack) (S.toList $ WF.textures model)
   uniforms' <- lift (defaultUniforms program')
   
   lift $ do
@@ -251,7 +251,7 @@ createTexturedMesh program' model = runEitherT $ do
   -- TODO: Initialise properly
   return Mesh { fAttributes = M.fromList attributes',
                 fPrimitive  = GL.Triangles,
-                fTexture    = listToMaybe textures',
+                fTexture    = texture',
                 fShader     = program',
                 fUniforms   = uniforms',
                 fPrepare    = Just prepareTextured,
@@ -261,7 +261,7 @@ createTexturedMesh program' model = runEitherT $ do
   where
     (Just vs) = sequence $ WF.fromIndices (model^.vertices)  (^.ivertex) (model^.faces)
     -- TODO: Deal with missing values properly (w.r.t texcoords and normals)
-    (Just ts) = sequence $ WF.fromIndices (model^.texcoords) (^.itexcoord.non (error "Missing texcoord")) (model^.faces)
+    (Just ts) = sequence $ WF.fromIndices (model^.texcoords) (^.itexcoord.non 0) (model^.faces)
     -- cs = diffuseColours (model^.faces)
     texturePath = ((maybe "." id (model^.root) </> "textures/") </>)
     prepareTextured mesh = do
@@ -280,7 +280,7 @@ onmousepress _ _ _ _ = putStrLn "Mouse button was pressed"
 mainloop :: IORef AppState -> IO ()
 mainloop appref = do
   app <- readIORef appref
-  maybe skip runCommand <$> tryTakeMVar (app^.command)
+  maybe skip (runCommand app) <$> tryTakeMVar (app^.command)
   render app
   GLFW.pollEvents
   unlessM (GLFW.windowShouldClose (app^.window)) (mainloop appref)
@@ -319,7 +319,7 @@ loadMeshes shader' fns = do
   models <- loadModels fns
   -- 
   -- Either String SimpleModel -> IO (Either String (Mesh Double Int))
-  mapM (either (return . Left) (createTexturedMesh shader')) models
+  mapM (either (return . Left) (createMesh shader')) models
 
 -- Scripting -------------------------------------------------------------------------------------------------------------------------------
 
@@ -329,8 +329,8 @@ feedCommand command' = getLine >>= putMVar command'
 
 
 -- |
-runCommand :: String -> IO ()
-runCommand cmd = do
+runCommand :: AppState -> String -> IO ()
+runCommand app cmd = do
   return ()
 
 -- FRP -------------------------------------------------------------------------------------------------------------------------------------
@@ -358,18 +358,23 @@ initial window' command' config' = AppState {
 
 -- |
 createWindow :: V2 Int -> IO (Maybe GLFW.Window)
-createWindow (V2 cx cy) = GLFW.createWindow (cx) (cy) "WaveFront OBJ Viewer (2016)" Nothing Nothing
+createWindow (V2 cx cy) = GLFW.createWindow cx cy "WaveFront OBJ Viewer (2016)" Nothing Nothing
 
 
 -- |
 windowFlags :: IO ()
 windowFlags = GLFW.windowHint $ GLFW.WindowHint'Samples 4
 
+
+-- | 
+showOutcome :: IO (Either String ()) -> IO ()
+showOutcome outcome = outcome >>= either print (const $ putStrLn "The program finished normally.")
+
 --------------------------------------------------------------------------------------------------------------------------------------------
 
 -- |
 main :: IO ()
-main = void . runEitherT $ do
+main = showOutcome . runEitherT $ do
   succeeded "Failed to create window" GLFW.init
   lift windowFlags
   window' <- EitherT $ fromMaybe "Failed to create window" <$> createWindow (config^.clientsize)

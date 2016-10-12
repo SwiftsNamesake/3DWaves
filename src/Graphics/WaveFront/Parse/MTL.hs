@@ -60,9 +60,9 @@ import Graphics.WaveFront.Types hiding (ambient, diffuse, specular)
 
 -- MTL parsing -----------------------------------------------------------------------------------------------------------------------------
 
--- | Produces a list of MTL tokens, with associated line numbers and comments
+-- | Produces a list of MTL tokens
 mtl :: (Fractional f) => Atto.Parser (MTL f Text [])
-mtl = Atto.sepBy row lineSeparator -- <* Atto.endOfInput
+mtl = Atto.sepBy row lineSeparator
 
 
 -- | Parses a single MTL row.
@@ -89,51 +89,54 @@ token = (Atto.string "Ka"     *> ambient)     <|>
 
 -- TODO: Expose these parsers for testing purposes (?)
 
--- |
+-- TODO | - Change definition of 'colour' and 'Colour' to only allow three channels (alpha is handled by the 'dissolve' attribute)
+--        - Change the definition of 'Colour' or use the one defined in the colour package
+
+-- | Three or four channel values (RGB[A])
 ambient :: (Fractional f) => Atto.Parser (MTLToken f s)
 ambient = Ambient <$> colour
 
 
--- |
+-- | Three or four channel values (RGB[A])
 diffuse :: (Fractional f) => Atto.Parser (MTLToken f s)
 diffuse = Diffuse <$> colour
 
 
--- |
+-- | Three or four channel values (RGB[A])
 specular :: (Fractional f) => Atto.Parser (MTLToken f s)
 specular = Specular <$> colour
 
 
--- |
+-- | A rational number, preceded by whitespace (specular exponent)
 specExp :: (Fractional f) => Atto.Parser (MTLToken f s)
 specExp = space *> (SpecularExponent <$> Atto.rational)
 
 
--- |
+-- | A number between 0 and 10 (inclusive) (illumination model)
 illum :: Atto.Parser (MTLToken f s)
 illum = space *> (Illum <$> clamped 0 10)
 
 
--- |
+-- | A rational number, preceded by whitespace (refraction index)
 refraction :: (Fractional f) => Atto.Parser (MTLToken f s)
 refraction = space *> (Refraction <$> Atto.rational)
 
 
--- |
+-- | A rational number, preceded by whitespace (doss)
 dissolve :: (Fractional f) => Atto.Parser (MTLToken f s)
 dissolve = space *> (Dissolve <$> Atto.rational)
 
 
--- |
+-- | A texture name, preceded by whitespace
 mapDiffuse :: Atto.Parser (MTLToken f Text)
 mapDiffuse = space *> (MapDiffuse <$> name)
 
 
--- |
+-- | A texture name, preceded by whitespace
 mapAmbient :: Atto.Parser (MTLToken f Text)
 mapAmbient = space *> (MapAmbient <$> name)
 
 
--- |
+-- | A material name, preceded by whitespace
 newMaterial :: Atto.Parser (MTLToken f Text)
 newMaterial = space *> (NewMaterial <$> name)

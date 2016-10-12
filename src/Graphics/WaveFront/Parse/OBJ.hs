@@ -66,16 +66,11 @@ obj :: (Fractional f, Integral i) => Atto.Parser (OBJ f Text i [])
 obj = Atto.sepBy row lineSeparator -- <* Atto.endOfInput
 
 
--- | Parses a token given a single valid OBJ row, or an error value if the input is malformed.
+-- | Parses a token given a single valid OBJ row
 --
--- TODO: Correctness (total function, no runtime exceptions)
--- TODO: Handle invalid rows (how to deal with mangled definitions w.r.t indices?)
-
--- TODO: Named errors (typed?) rather than Nothing (cf. Either) (?)
---       Type for unsupported but valid (according to spec) attributes (?)
---       Type for specific attribute that failed to parse (eg. "f 1/2 0/p 1.5/x")
---
--- TODO: Use ListLike or Monoid (or maybe Indexable, since that's the real requirement) (?)
+-- TODO | - Correctness (total function, no runtime exceptions)
+--        - Handle invalid rows (how to deal with mangled definitions w.r.t indices?)
+--        - Use ListLike or Monoid (or maybe Indexable, since that's the real requirement) (?)
 row :: (Fractional f, Integral i) => Atto.Parser (OBJToken f Text i [])
 row = token <* ignore comment -- TODO: Let the separator handle comments (?)
 
@@ -91,76 +86,87 @@ token = (Atto.string "f"  *> face)    <|>
         (Atto.string "v"  *> vertex)  <|>
         (Atto.string "o"  *> object)  <|>
         (Atto.string "g"  *> group)   <|>
-        (Atto.string "s"  *> smooth)  <|> -- Smooth shading (TODO: Don't ignore)
+        (Atto.string "s"  *> smooth)  <|>
         (Atto.string "mtllib" *> lib) <|>
         (Atto.string "usemtl" *> use)
 
     
 -- TODO: Expose these parsers for testing purposes (?)
 
+--------------------------------------------------------------------------------------------------------------------------------------------
 
--- |
+-- | Three or more vertex definitions (cf. 'vertexIndices' for details)
 face :: Integral i => Atto.Parser (OBJToken f Text i [])
-face = OBJFace <$> atleast 3 (space *> vertexIndices)
+face = OBJFace <$> (space *> vertexIndices)
 
 
--- |
+-- | A single vertex definition with indices for vertex position, normal, and texture coordinates
+--
+-- TODO: | - Should the slashes be optional?
+--         - Allowed trailing slashes (I'll have to check the spec again) (?)
+--
+-- f Int[/((Int[/Int])|(/Int))]
+vertexIndices :: Integral i => Atto.Parser (VertexIndices i)
+vertexIndices = atleast 3 (ivertex <*> index   <*> index)     <|> -- vi/ti/ni
+                atleast 3 (ivertex <*> nothing <*> skipIndex) <|> -- vi//ni
+                atleast 3 (ivertex <*> index   <*> nothing)   <|> -- vi/ti
+                atleast 3 (ivertex <*> nothing <*> nothing)       -- vi
+  where
+    ivertex :: Integral i => Atto.Parser (Maybe i -> Maybe i -> VertexIndices i)
+    ivertex = VertexIndices <$> Atto.decimal
+
+    index :: Integral i => Atto.Parser (Maybe i)
+    index = Just <$> (Atto.char '/' *> Atto.decimal)
+    
+    skipIndex :: Integral i => Atto.Parser (Maybe i)
+    skipIndex = Atto.char '/' *> index
+
+    nothing :: Atto.Parser (Maybe i)
+    nothing = pure Nothing
+
+-- Geometry primitives ---------------------------------------------------------------------------------------------------------------------
+
+-- | Two integers, separated by whitespace
 line :: Integral i => Atto.Parser (OBJToken f Text i m)
 line = Line <$> (space *> Atto.decimal) <*> (space *> Atto.decimal)
 
+--------------------------------------------------------------------------------------------------------------------------------------------
 
--- |
+-- | Three cordinates, separated by whitespace
 normal :: (Fractional f) => Atto.Parser (OBJToken f Text i m)
 normal = OBJNormal <$> point3D
 
 
--- |
+-- | Two coordinates, separated by whitespace
 texture :: (Fractional f) => Atto.Parser (OBJToken f Text i m)
 texture = OBJTexture <$> point2D
 
 
--- |
+-- | Three coordinates, separated by whitespace
 vertex :: (Fractional f) =>  Atto.Parser (OBJToken f s i m)
 vertex  = OBJVertex <$> point3D
 
 
--- |
+-- | Object names, separated by whitespace
 object :: Atto.Parser (OBJToken f Text i m)
 object = Object . S.fromList <$> atleast 1 (space *> name)
 
 
--- |
+-- | Group names, separated by whitespace
 group :: Atto.Parser (OBJToken f Text i m)
 group = Group . S.fromList <$> atleast 1 (space *> name)
 
 
--- |
+-- | Either 'on' or 'off'
 smooth :: Atto.Parser (OBJToken f s i m)
 smooth = SmoothShading <$> (space *> toggle)
 
 
--- |
+-- | An MTL library name
 lib :: Atto.Parser (OBJToken f Text i m)
 lib = LibMTL <$> (space *> name)
 
 
--- |
+-- | An MTL material name
 use :: Atto.Parser (OBJToken f Text i m)
 use = UseMTL <$> (space *> name)
-
-
--- | A single vertex definition with indices for vertex position, normal, and texture coordinates
--- TODO: Should the slashes be optional?
--- TODO: PLEASE FIX THIS, FUTURE SELF
--- f Int[/((Int[/Int])|(/Int))]
--- VertexIndices ivert inorm itex
-vertexIndices :: Integral i => Atto.Parser (VertexIndices i)
-vertexIndices = VertexIndices <$>
-                  Atto.decimal <*>
-                  ((Atto.char '/' *> (Just <$> Atto.decimal   <|> pure Nothing)) <|> pure Nothing) <*>
-                  ((Atto.char '/' *> (Just <$> Atto.decimal)) <|> pure Nothing)
-                  -- ((Atto.char '/' *> Atto.decimal) <|> (Atto.char '/' *> pure Nothing *> ))
-                  -- optional (Atto.char '/' *> )
-                  -- optional (Atto.char '/' *> optional Atto.decimal) <*>
-                  -- optional (Atto.char '/' *> optional Atto.decimal)
-    

@@ -1,11 +1,11 @@
 -- |
 -- Module      : Graphics.WaveFront.Model
 -- Description :
--- Copyright   : (c) Jonatan H Sundqvist, October 2 2016
+-- Copyright   : (c) Jonatan H Sundqvist, 2016
 -- License     : MIT
 -- Maintainer  : Jonatan H Sundqvist
--- Stability   : experimental|stable
--- Portability : POSIX (not sure)
+-- Stability   : stable
+-- Portability : portable
 --
 
 -- TODO | - Single-pass (eg. consume all tokens only once) for additional performance (?)
@@ -75,13 +75,21 @@ import Graphics.WaveFront.Lenses
 
 --------------------------------------------------------------------------------------------------------------------------------------------
 
--- |
+-- TODO | - Factor out these combinators
+
+-- | Performs a computation on adjacent pairs in a list
 -- TODO | - Factor out and make generic
 pairwise :: (a -> a -> b) -> [a] -> [b]
 pairwise f xs = zipWith f xs (drop 1 xs)
 
 
--- |
+-- | Convers an Either to a Maybe
+eitherToMaybe :: Either a b -> Maybe b
+eitherToMaybe (Right b) = Just b
+eitherToMaybe (Left _)  = Nothing
+
+
+-- | Converts a Maybe to an Either
 maybeToEither :: a -> Maybe b -> Either a b
 maybeToEither _ (Just b)  = Right b
 maybeToEither a (Nothing) = Left a
@@ -90,8 +98,7 @@ maybeToEither a (Nothing) = Left a
 
 -- TODO | - Move to separate module (eg. WaveFront.Model)
 
--- | Creates a mapping between group names and the corresponding bounds ([lower, upper)). Invalid
---   tokens are simply discarded by this function.
+-- | Creates a mapping between group names and the corresponding bounds ([lower, upper)).
 --
 -- TODO | - Figure out how to deal with multiple group names (eg. "g mesh1 nose head")
 groupsOf :: (Ord s, Integral i) => [OBJToken f s i m] -> Map (Set s) (i, i)
@@ -101,7 +108,7 @@ groupsOf = buildIndexMapWith . filter notObject
     notObject  _         = True
 
 
--- |
+-- | Creates a mapping between object names and the corresponding bounds ([lower, upper)).
 objectsOf :: (Ord s, Integral i) => [OBJToken f s i m] -> Map (Set s) (i, i)
 objectsOf = buildIndexMapWith . filter notGroup
   where
@@ -152,7 +159,7 @@ createFace materials' libName matName indices' = do
   Right $ Face { fIndices=indices', fMaterial=material' }
 
 
--- |
+-- | Tries to find a given material in the specified MTL table
 -- TODO: Specify missing material or library name (would require additional constraints on 's')
 -- TODO: Refactor
 lookupMaterial :: Ord s => MTLTable f s -> s -> s -> Either String (Material f s)
@@ -162,7 +169,7 @@ lookupMaterial materials' libName matName = do
 
 -- Parser output churners (MTL) ------------------------------------------------------------------------------------------------------------
 
--- |
+-- | Constructs an MTL table from a list of (libraryName, token stream) pairs.
 -- TODO | - Refactor, simplify
 createMTLTable :: Ord s => [(s, [MTLToken f s])] -> Either String (MTLTable f s)
 createMTLTable = fmap M.fromList . mapM (\(name, tokens) -> (name,) <$> materialsOf tokens)
@@ -185,7 +192,7 @@ createMaterial (NewMaterial name:attrs) = (name,) <$> fromAttributes attrs
 createMaterial  attrs                   = Left  $ "Free-floating attributes"
 
 
--- |
+-- | Breaks a stream of MTL tokens into lists of material definitions
 -- TODO | - Rename (eg. groupMaterials) (?)
 partitionMaterials :: [MTLToken f s] -> [[MTLToken f s]]
 partitionMaterials = groupBy (\_ b -> not $ isNewMaterial b)
@@ -251,7 +258,7 @@ tessellate = indices %~ triangles
     triangles (a:rest) = concat $ pairwise (\b c -> [a, b, c]) rest
 
 
--- |
+-- | Finds the axis-aligned bounding box of the model
 -- TODO | - Deal with empty vertex lists (?)
 --        - Refactor
 --        - Folding over applicative (fold in parallel)
@@ -271,28 +278,38 @@ bounds model = fromExtents $ axisBounds (model^.vertices) <$> V3 x y z
 
 --------------------------------------------------------------------------------------------------------------------------------------------
 
--- |
+-- TODO | - Polymorphic indexing and traversing
+--        - Profile, optimise
+--        - Index buffers
+
+
+-- | Takes a vector of data, an index function, a choice function, a vector of some type with indices
+--   and uses the indices to constructs a new Vector with the data in the original vector.
+--
 -- TODO | - Factor out the buffer-building logic
-fromIndices :: Integral i => V.Vector (v Double) -> (VertexIndices i ->  i) -> V.Vector (Face Double Text i V.Vector) -> V.Vector (Maybe (v Double))
-fromIndices data' choose faces' = V.concatMap (fromFaceIndices data' choose) faces'
+--        - Rewrite the docs...
+fromIndices :: Vector v -> (Vector v -> i -> b) -> (a -> i) -> Vector a -> Vector b
+fromIndices data' index choose = V.map (index data' . choose)
 
 
 -- |
-fromFaceIndices :: Integral i => V.Vector (v Double) -> (VertexIndices i ->  i) -> Face Double Text i V.Vector -> V.Vector (Maybe (v Double))
-fromFaceIndices data' choose face' = V.map ((data' !?) . fromIntegral . subtract 1 . choose) . (^.indices) $ face'
+-- . fromIntegral . subtract 1
+-- . (^.indices)
+fromFaceIndices :: Integral i => Vector (v f) -> index -> (VertexIndices i ->  i) -> Face f Text i Vector -> Vector (Maybe (v f))
+fromFaceIndices data' index choose = V.concatMap (fromIndices data' index choose) . (^.indices)
 
 
 -- |
-diffuseColours :: V.Vector (Face f s i V.Vector) -> V.Vector (Colour f)
+diffuseColours :: Vector (Face f s i Vector) -> Vector (Colour f)
 diffuseColours faces' = V.concatMap (\f -> V.replicate (V.length $ f^.indices) (f^.material.diffuse)) faces'
 
 -- Model queries ---------------------------------------------------------------------------------------------------------------------------
 
--- |
+-- | Does the model have textures?
 hasTextures :: Ord s => Model f s i m -> Bool
 hasTextures =  not . S.null . textures
 
 
--- | All texture names as a list
+-- | The set of all texture names
 textures :: Ord s => Model f s i m -> S.Set s
 textures = S.fromList . catMaybes . map (^.texture) . concatMap M.elems . M.elems . (^.materials)
