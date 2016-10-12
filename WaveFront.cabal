@@ -84,16 +84,7 @@ library
                        Graphics.WaveFront.Parse.MTL
 
   -- Compiler arguments
-  ghc-options:         -fwarn-tabs
-                       -fwarn-unused-imports
-                       -- -fwarn-name-shadowing
-                       -fwarn-incomplete-uni-patterns
-                       -fwarn-incomplete-patterns
-                       -fwarn-overlapping-patterns
-                       -fwarn-incomplete-record-updates
-                       -fwarn-missing-signatures
-                       -fwarn-monomorphism-restriction
-                       -fwarn-orphans
+  ghc-options:         -Wall
 
   -- LANGUAGE extensions used by modules in this package.
   -- TODO: This list is incomplete
@@ -130,7 +121,7 @@ executable Viewer
   -- TODO: Parallel compilation and larger stack
   -- ghci -j8 +RTS -A128m
   if flag(pedantic)
-    ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+    ghc-options:         -Wall
                          
   
   if flag(profile)

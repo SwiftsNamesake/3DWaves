@@ -97,7 +97,7 @@ token = (Atto.string "f"  *> face)    <|>
 
 -- | Three or more vertex definitions (cf. 'vertexIndices' for details)
 face :: Integral i => Atto.Parser (OBJToken f Text i [])
-face = OBJFace <$> (space *> vertexIndices)
+face = OBJFace <$> vertexIndices
 
 
 -- | A single vertex definition with indices for vertex position, normal, and texture coordinates
@@ -106,11 +106,11 @@ face = OBJFace <$> (space *> vertexIndices)
 --         - Allowed trailing slashes (I'll have to check the spec again) (?)
 --
 -- f Int[/((Int[/Int])|(/Int))]
-vertexIndices :: Integral i => Atto.Parser (VertexIndices i)
-vertexIndices = atleast 3 (ivertex <*> index   <*> index)     <|> -- vi/ti/ni
-                atleast 3 (ivertex <*> nothing <*> skipIndex) <|> -- vi//ni
-                atleast 3 (ivertex <*> index   <*> nothing)   <|> -- vi/ti
-                atleast 3 (ivertex <*> nothing <*> nothing)       -- vi
+vertexIndices :: Integral i => Atto.Parser [VertexIndices i]
+vertexIndices = atleast 3 (space *> (ivertex <*> index   <*> index))     <|> -- vi/ti/ni
+                atleast 3 (space *> (ivertex <*> nothing <*> skipIndex)) <|> -- vi//ni
+                atleast 3 (space *> (ivertex <*> index   <*> nothing))   <|> -- vi/ti
+                atleast 3 (space *> (ivertex <*> nothing <*> nothing))       -- vi
   where
     ivertex :: Integral i => Atto.Parser (Maybe i -> Maybe i -> VertexIndices i)
     ivertex = VertexIndices <$> Atto.decimal
@@ -139,7 +139,7 @@ normal = OBJNormal <$> point3D
 
 -- | Two coordinates, separated by whitespace
 texture :: (Fractional f) => Atto.Parser (OBJToken f Text i m)
-texture = OBJTexture <$> point2D
+texture = OBJTexCoord <$> point2D
 
 
 -- | Three coordinates, separated by whitespace

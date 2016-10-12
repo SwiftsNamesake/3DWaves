@@ -231,9 +231,9 @@ materialColours attrs = (,,) <$>
 createModel :: (Ord s, Integral i) => OBJ f s i [] -> MTLTable f s -> Maybe FilePath -> Either String (Model f s i Vector)
 createModel tokens materials root = do
     faces' <- sequence $ facesOf tokens materials
-    return $ Model { fVertices  = V.fromList [ vec | OBJVertex  vec <- tokens ],
-                     fNormals   = V.fromList [ vec | OBJNormal  vec <- tokens ],
-                     fTexcoords = V.fromList [ vec | OBJTexture vec <- tokens ],
+    return $ Model { fVertices  = V.fromList [ vec | OBJVertex   vec <- tokens ],
+                     fNormals   = V.fromList [ vec | OBJNormal   vec <- tokens ],
+                     fTexcoords = V.fromList [ vec | OBJTexCoord vec <- tokens ],
                      fFaces     = packFaces faces',
                      fGroups    = groupsOf  tokens,
                      fObjects   = objectsOf tokens,
@@ -295,8 +295,8 @@ fromIndices data' index choose = V.map (index data' . choose)
 -- |
 -- . fromIntegral . subtract 1
 -- . (^.indices)
-fromFaceIndices :: Integral i => Vector (v f) -> index -> (VertexIndices i ->  i) -> Face f Text i Vector -> Vector (Maybe (v f))
-fromFaceIndices data' index choose = V.concatMap (fromIndices data' index choose) . (^.indices)
+fromFaceIndices :: Integral i => Vector (v f) -> (Vector (v f) -> a -> b) -> (VertexIndices i ->  a) -> Vector (Face f Text i Vector) -> Vector b
+fromFaceIndices data' index choose = V.concatMap (fromIndices data' index (choose) . (^.indices))
 
 
 -- |

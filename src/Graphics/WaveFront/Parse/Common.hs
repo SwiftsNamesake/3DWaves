@@ -60,7 +60,7 @@ wholeFile p = cutToTheChase *> p <* cutToTheChase <* Atto.endOfInput
 -- TODO | - Rename (?)
 --        - Skip whitespace
 cutToTheChase :: Atto.Parser ()
-cutToTheChase = Atto.skipMany ((comment *> pure ()) <|> (Atto.satisfy isLinearSpace) <|> Atto.endOfLine)
+cutToTheChase = Atto.skipMany ((comment *> pure ()) <|> (Atto.satisfy isLinearSpace *> pure ()) <|> Atto.endOfLine)
 
 
 -- | OBJ rows may be separated by one or more lines of comments and whitespace, or empty lines.

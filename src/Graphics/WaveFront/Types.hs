@@ -53,19 +53,21 @@ import Linear (V2(..), V3(..))
 
 -- OBJ parser types ------------------------------------------------------------------------------------------------------------------------
 
+-- TODO | - Add strictness annotations (?)
+
+
 -- | Represents a single (valid) OBJ token
 --
 -- TODO | - Polymorphic numerical types (?)
 --        - Add context, metadata (eg. line numbers, filename) (?)
 --        - Naming scheme (added OBJ prefix to prevent name clashes; cf. Face type)
 --        - Comment token (preserve comments in parser output or remove them) (?)
---        - Rename OBJTexture (eg. to 'OBJTexCoord')
 --
 --        - Cover the entire spec (http://www.martinreddy.net/gfx/3d/OBJ.spec)
 --          (and handle unimplemented attributes gracefully)
-data OBJToken f s i m = OBJVertex  (V3 f) |
-                        OBJNormal  (V3 f) |
-                        OBJTexture (V2 f) |
+data OBJToken f s i m = OBJVertex   (V3 f) |
+                        OBJNormal   (V3 f) |
+                        OBJTexCoord (V2 f) |
                         OBJFace (m (VertexIndices i)) | -- TODO: Associate material with each face, handle absent indices
 
                         Line i i | -- Line (I'm assuming the arguments are indices to the endpoint vertices)
@@ -77,8 +79,8 @@ data OBJToken f s i m = OBJVertex  (V3 f) |
 
 
                         -- TODO: Use OBJ prefix (?)
-                        Group  (Set s) |   -- TODO: Do grouped faces have to be consecutive?
-                        Object (Set s)     -- TODO: What is the difference between group and object?
+                        Group  (Set s) | -- TODO: Do grouped faces have to be consecutive?
+                        Object (Set s)   -- TODO: What is the difference between group and object?
                         -- deriving (Show, Eq) -- TODO: Derive Read (?)
 
 
@@ -92,12 +94,7 @@ data VertexIndices i = VertexIndices {
 } deriving (Show, Eq)
 
 
--- |
--- TODO: Rename (?)
-data OBJNoParse s = OBJComment s | OBJEmpty | OBJNoSuchAttribute s | OBJNoParse s deriving (Show, Eq)
-
-
--- | Output type of the OBJ parser. Currently a list-like structure of line number and token (or error string) pairs
+-- | Output type of the OBJ parser.
 --
 -- TODO | - Rename (?)
 --        - Use Integral for line number (?)

@@ -24,9 +24,14 @@ See source files (.hs) for additional items.
       - Parallelism (...)
 - [ ] Add sample models and demos (...)
 - [ ] Add profiling and checks (cf. QuickCheck)
+      - Travis-CI integration
 - [x] GHCi support (added .ghci file, works quite well)
 - [x] Proper ticket system ([here](https://github.com/SwiftsNamesake/3DWaves/issues/))
 - [ ] Polymorphism (...)
+- [ ] Querying
+      - Asking questions about a particular model (bounds, storage, number of faces, material types, etc.)
+      - Asking questions about the OBJ and MTL formats (eg. 'what does the various illum values mean')
+      - Screenshots (maybe in the wavefront-render package)
 - [ ] Serialising (eg. writing to OBJ and MTL)
 - [ ] Rendering
       - Create a separate package (wavefront-render) with an OpenGL backend

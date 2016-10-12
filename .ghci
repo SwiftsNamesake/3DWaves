@@ -12,7 +12,7 @@ import qualified Data.Attoparsec.Text as Atto
 import qualified Graphics.WaveFront.Parse        as Parse
 import qualified Graphics.WaveFront.Parse.Common as Parse
 
-import qualified Graphics.WaveFront.Load as Load 
+import qualified Graphics.WaveFront.Load as Load
 
 import Control.Lens as L
 
