@@ -24,6 +24,7 @@
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 --{-# LANGUAGE OverloadedLists   #-}
 
 
@@ -101,6 +102,7 @@ maybeToEither a (Nothing) = Left a
 -- | Creates a mapping between group names and the corresponding bounds ([lower, upper)).
 --
 -- TODO | - Figure out how to deal with multiple group names (eg. "g mesh1 nose head")
+--        - Include not just face indices but vertex indices (makes it easier to 'slice' GPU buffers) (maybe in a separate function)
 groupsOf :: (Ord s, Integral i) => [OBJToken f s i m] -> Map (Set s) (i, i)
 groupsOf = buildIndexMapWith . filter notObject
   where
@@ -140,16 +142,29 @@ buildIndexMapWith tokens = M.fromList . pairwise zipIndices . reverse . addLastI
 --        - Improve naming scheme (lots of primes)
 --        - Default material, take 'error-handling' function (?)
 --        - Can vertices in the same face have different materials (?)
-facesOf :: Ord s => [OBJToken f s i m] -> MTLTable f s -> [Either String (Face f s i m)]
-facesOf tokens materials' = reverse . (^._3) . foldl update (Nothing, Nothing, []) $ tokens
+facesOf :: forall f s i m. Ord s => [OBJToken f s i m] -> MTLTable f s -> [Either String (Face f s i m)]
+facesOf tokens materials' = makeFaces Nothing Nothing tokens --reverse . (^._3) . foldl update (Nothing, Nothing, []) $ tokens
   where 
     -- TODO: Keep refactoring...
-    update acc@(Just libName, Just matName, faces') (OBJFace indices') = acc & _3 .~ (createFace materials' libName matName indices' : faces')
-    update acc@(Nothing,      _,            faces') (OBJFace _)        = acc & _3 .~ (Left "No library selected for face" : faces')
-    update acc@(_,            Nothing,      faces') (OBJFace _)        = acc & _3 .~ (Left "No material selected for face" : faces')
-    update acc                                      (LibMTL  libName)  = acc & _1 .~ (Just libName)
-    update acc                                      (UseMTL  matName)  = acc & _2 .~ (Just matName)
-    update acc                                       _                 = acc
+    -- | It's not always rude to make faces
+    makeFaces :: Maybe s -> Maybe s -> [OBJToken f s i m] -> [Either String (Face f s i m)]
+    makeFaces _                  _                  []              = []
+    makeFaces lib@(Just libName) mat@(Just matName) (OBJFace is:xs) = createFace materials' libName matName is : makeFaces lib mat xs
+
+    makeFaces lib@Nothing        mat                (OBJFace _:xs)  = Left "No library selected for face"      : makeFaces lib mat xs
+    makeFaces lib                mat@Nothing        (OBJFace _:xs)  = Left "No material selected for face"     : makeFaces lib mat xs
+
+    makeFaces _                  mat                (LibMTL  libName:xs)  = makeFaces (Just libName) mat xs
+    makeFaces lib                _                  (UseMTL  matName:xs)  = makeFaces lib (Just matName) xs
+
+    makeFaces lib                mat                (_:xs)                = makeFaces lib mat xs
+
+    -- update acc@(Just libName, Just matName, faces') (OBJFace indices') = acc & _3 .~ (createFace materials' libName matName indices' : faces')
+    -- update acc@(Nothing,      _,            faces') (OBJFace _)        = acc & _3 .~ (Left "No library selected for face" : faces')
+    -- update acc@(_,            Nothing,      faces') (OBJFace _)        = acc & _3 .~ (Left "No material selected for face" : faces')
+    -- update acc                                      (LibMTL  libName)  = acc & _1 .~ (Just libName)
+    -- update acc                                      (UseMTL  matName)  = acc & _2 .~ (Just matName)
+    -- update acc                                       _                 = acc
 
 
 -- |
@@ -189,7 +204,7 @@ materialsOf = fmap M.fromList . mapM createMaterial . partitionMaterials
 --   The first token should be a new material name.
 createMaterial :: [MTLToken f s] -> Either String (s, Material f s)
 createMaterial (NewMaterial name:attrs) = (name,) <$> fromAttributes attrs
-createMaterial  attrs                   = Left  $ "Free-floating attributes"
+createMaterial  attrs                   = Left $ "Free-floating attributes"
 
 
 -- | Breaks a stream of MTL tokens into lists of material definitions

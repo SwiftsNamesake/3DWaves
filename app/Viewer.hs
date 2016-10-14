@@ -217,7 +217,7 @@ render app = do
   clear [ColorBuffer, DepthBuffer]
   
   forM (app^.scene.meshes) $ \m -> do
-    putStrLn "Rendering mesh..." >> hFlush stdout
+    -- putStrLn "Rendering mesh..." >> hFlush stdout
     Mesh.render m
 
   GLFW.swapBuffers (app^.window)
@@ -276,6 +276,8 @@ createMesh program' model = runEitherT $ do
   white     <- lift $ Texture.createRepaTexture (V2 2 2) (\_ -> (255,255,255,255))
   texture'  <- EitherT $ fromMaybe (Right white) . listToMaybe <$> mapM (readTexture . texturePath . T.unpack) (S.toList $ WF.textures model)
   uniforms' <- defaultUniforms program'
+
+  lift $ when (texture' == white) (putStrLn "Using default texture")
 
   -- TODO: Initialise properly
   lift $ putStrLn "Done creating mesh" >> hFlush stdout
