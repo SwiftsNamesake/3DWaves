@@ -13,6 +13,9 @@ Please note that this package is *completely unaware of rendering and graphics*.
 
 I may at some point implement the FFI and add direct OpenGL support, in separate modules.
 
+## Examples
+
+
 ## Maintainers
 Jonatan H Sundqvist
 
@@ -38,3 +41,4 @@ See source files (.hs) for additional items.
 - [ ] Executables
       - OBJ viewer (...)
       - Command line tool (?)
+- [ ] Foreign function interface

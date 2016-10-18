@@ -32,7 +32,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- Section
 --------------------------------------------------------------------------------------------------------------------------------------------
--- TODO: Clean this up
+-- TODO | - Clean this up
 module Graphics.WaveFront.Model (
   BoundingBox(..),
   facesOf,  materialsOf,
@@ -122,31 +122,30 @@ objectsOf = buildIndexMapWith . filter notGroup
 --
 -- TODO | - Refactor, simplify
 --        - What happens if the same group or object appears multiple times (is that possible?)
---
+--        - Rename or add function parameter (the -With suffix implies a function parameter)
 buildIndexMapWith :: (Ord s, Integral i) => [OBJToken f s i m] -> Map (Set s) (i, i)
-buildIndexMapWith tokens = M.fromList . pairwise zipIndices . reverse . addLastIndex $ foldl update (0, []) $ tokens
+buildIndexMapWith = M.fromList . pairwise zipIndices . update 0
   where
-    addLastIndex (nfaces, groups') = (S.empty, nfaces):groups'
     zipIndices (names, low) (_, upp) = (names, (low, upp))
-    update (nfaces, groups') token = case token of
-      Group   names -> (nfaces,   (names, nfaces):groups')
-      Object  names -> (nfaces,   (names, nfaces):groups')
-      OBJFace _     -> (nfaces+1, groups')
-      _             -> (nfaces,   groups')
+    
+    -- TODO | - Separate Group and Object lists
+    --        - Rename (?)
+    --        - Factor out (might be useful for testing) (?)
+    update faceCount []                = [(S.empty, faceCount)]
+    update faceCount (Group names:xs)  = (names, faceCount) : update faceCount xs
+    update faceCount (Object names:xs) = (names, faceCount) : update faceCount xs
+    update faceCount (OBJFace _:xs)    = update (faceCount + 1) xs
+    update faceCount (_:xs)            = update faceCount xs
 
 
 -- | Filters out faces from a stream of OBJTokens and attaches the currently selected material,
 --   as defined by the most recent LibMTL and UseMTL tokens.
---
--- TODO | - Don't use foldl (?)
---        - Improve naming scheme (lots of primes)
---        - Default material, take 'error-handling' function (?)
---        - Can vertices in the same face have different materials (?)
-facesOf :: forall f s i m. Ord s => [OBJToken f s i m] -> MTLTable f s -> [Either String (Face f s i m)]
-facesOf tokens materials' = makeFaces Nothing Nothing tokens --reverse . (^._3) . foldl update (Nothing, Nothing, []) $ tokens
+facesOf :: forall f s i m. Ord s => MTLTable f s -> [OBJToken f s i m] -> [Either String (Face f s i m)]
+facesOf materials' = makeFaces Nothing Nothing
   where 
-    -- TODO: Keep refactoring...
     -- | It's not always rude to make faces
+    -- TODO | - Keep refactoring...
+    --        - Rename (?)
     makeFaces :: Maybe s -> Maybe s -> [OBJToken f s i m] -> [Either String (Face f s i m)]
     makeFaces _                  _                  []              = []
     makeFaces lib@(Just libName) mat@(Just matName) (OBJFace is:xs) = createFace materials' libName matName is : makeFaces lib mat xs
@@ -159,13 +158,6 @@ facesOf tokens materials' = makeFaces Nothing Nothing tokens --reverse . (^._3) 
 
     makeFaces lib                mat                (_:xs)                = makeFaces lib mat xs
 
-    -- update acc@(Just libName, Just matName, faces') (OBJFace indices') = acc & _3 .~ (createFace materials' libName matName indices' : faces')
-    -- update acc@(Nothing,      _,            faces') (OBJFace _)        = acc & _3 .~ (Left "No library selected for face" : faces')
-    -- update acc@(_,            Nothing,      faces') (OBJFace _)        = acc & _3 .~ (Left "No material selected for face" : faces')
-    -- update acc                                      (LibMTL  libName)  = acc & _1 .~ (Just libName)
-    -- update acc                                      (UseMTL  matName)  = acc & _2 .~ (Just matName)
-    -- update acc                                       _                 = acc
-
 
 -- |
 createFace :: Ord s => MTLTable f s -> s -> s -> m (VertexIndices i) -> Either String (Face f s i m)
@@ -175,8 +167,8 @@ createFace materials' libName matName indices' = do
 
 
 -- | Tries to find a given material in the specified MTL table
--- TODO: Specify missing material or library name (would require additional constraints on 's')
--- TODO: Refactor
+-- TODO | - Specify missing material or library name (would require additional constraints on 's')
+--        - Refactor
 lookupMaterial :: Ord s => MTLTable f s -> s -> s -> Either String (Material f s)
 lookupMaterial materials' libName matName = do
   library <- maybeToEither "No such library" (M.lookup libName materials')
@@ -245,7 +237,7 @@ materialColours attrs = (,,) <$>
 -- I never knew pattern matching in list comprehensions could be used to filter by constructor
 createModel :: (Ord s, Integral i) => OBJ f s i [] -> MTLTable f s -> Maybe FilePath -> Either String (Model f s i Vector)
 createModel tokens materials root = do
-    faces' <- sequence $ facesOf tokens materials
+    faces' <- sequence $ facesOf materials tokens 
     return $ Model { fVertices  = V.fromList [ vec | OBJVertex   vec <- tokens ],
                      fNormals   = V.fromList [ vec | OBJNormal   vec <- tokens ],
                      fTexcoords = V.fromList [ vec | OBJTexCoord vec <- tokens ],
@@ -281,15 +273,16 @@ tessellate = indices %~ triangles
 bounds :: (Num f, Ord f, Foldable m, HasVertices (Model f s i m) (m (V3 f))) => Model f s i m -> BoundingBox (V3 f)
 bounds model = fromExtents $ axisBounds (model^.vertices) <$> V3 x y z
   where
-    -- TODO: Factor out 'minmax'
+    -- TODO | - Factor out 'minmax'
     minmaxBy :: (Ord o, Num o, Foldable m) => (a -> o) -> m a -> (o, o)
     minmaxBy f values = foldr (\val' acc -> let val = f val' in (min val (fst acc), max val (snd acc))) (0, 0) values -- TODO: Factor out
 
     axisBounds vs axis = minmaxBy (^.axis) vs
 
+-- Orphaned TODOs?
 
--- TODO: Deal with missing values properly
--- TODO: Indexing should be defined in an API function
+-- TODO | - Deal with missing values properly
+--        - Indexing should be defined in an API function
 
 --------------------------------------------------------------------------------------------------------------------------------------------
 

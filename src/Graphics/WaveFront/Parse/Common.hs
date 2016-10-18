@@ -10,8 +10,8 @@
 -- TODO | - Fully polymorphic (even in the string and list types) (?)
 --        - 
 
--- SPEC | -
---        -
+-- SPEC | - 
+--        - 
 
 
 
@@ -32,12 +32,10 @@ module Graphics.WaveFront.Parse.Common where
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
-import Data.Text (Text, pack)
-
+import           Data.Text (Text, pack)
 import qualified Data.Attoparsec.Text as Atto
 
 import Control.Applicative (pure, liftA2, (<$>), (<*>), (<*), (*>), (<|>))
-
 import Linear (V2(..), V3(..))
 
 import Graphics.WaveFront.Types
@@ -56,7 +54,7 @@ wholeFile :: Atto.Parser a -> Atto.Parser a
 wholeFile p = cutToTheChase *> p <* cutToTheChase <* Atto.endOfInput
 
 
--- | Skips any leading comments and empty lines
+-- | Skips any leading comments, line breaks and empty lines
 -- TODO | - Rename (?)
 --        - Skip whitespace
 cutToTheChase :: Atto.Parser ()
@@ -154,8 +152,15 @@ point2D = V2 <$> coord <*> coord
 
 
 -- |
+clamp :: Ord n => n -> n -> n -> Atto.Parser n
+clamp lower upper n
+  | between lower upper n = pure n
+  | otherwise             = fail "Number not in range"
+  where
+    between lw up n = (lower <= n) && (n <= upper)
+    -- between 0 <. n <. 5
+
+-- |
 -- TODO | - Clean up and generalise
 clamped :: Integral i => i -> i -> Atto.Parser i
-clamped lower upper = Atto.decimal >>= \n -> if (lower <= n) && (n <= upper)
-                                               then return n
-                                               else fail "Number not in range"
+clamped lower upper = Atto.decimal >>= clamp lower upper
