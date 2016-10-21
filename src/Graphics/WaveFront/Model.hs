@@ -33,6 +33,7 @@
 -- Section
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- TODO | - Clean this up
+--        - Decide on API
 module Graphics.WaveFront.Model (
   BoundingBox(..),
   facesOf,  materialsOf,

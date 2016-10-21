@@ -24,14 +24,34 @@
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- API
 --------------------------------------------------------------------------------------------------------------------------------------------
-module Graphics.WaveFront () where -- TODO: Fill this in
+-- TODO | - Decide on an API
+module Graphics.WaveFront (
+  -- ^ OBJ types
+  OBJToken(..), VertexIndices(..), OBJ,
+  
+  -- ^ MTL types
+  MTLToken(..), Illumination(..), MTL, MTLTable(..),
+  
+  -- ^ Model types
+  Face(..), Colour(..), Material(..), Model(..),
+  
+  -- ^ Parsing
+  module Graphics.WaveFront.Parse,
+  
+  -- ^ Model functions
+  createModel, tessellate, bounds, fromIndices, fromFaceIndices, diffuseColours, hasTextures, textures,
+
+  -- ^ Loading
+  module Load
+) where
 
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
--- import           Graphics.WaveFront.Types
--- import qualified Graphics.WaveFront.Parse        as Parse
--- import qualified Graphics.WaveFront.Parse.Common as Parse
--- import           Graphics.WaveFront.Model
+import Graphics.WaveFront.Types
+import Graphics.WaveFront.Parse
+import Graphics.WaveFront.Parse.Common
+import Graphics.WaveFront.Model
+import qualified Graphics.WaveFront.Load as Load
