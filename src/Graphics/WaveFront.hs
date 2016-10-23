@@ -26,23 +26,27 @@
 --------------------------------------------------------------------------------------------------------------------------------------------
 -- TODO | - Decide on an API
 module Graphics.WaveFront (
-  -- ^ OBJ types
+  -- * OBJ types
   OBJToken(..), VertexIndices(..), OBJ,
   
-  -- ^ MTL types
+  -- * MTL types
   MTLToken(..), Illumination(..), MTL, MTLTable(..),
   
-  -- ^ Model types
+  -- * Model types
   Face(..), Colour(..), Material(..), Model(..),
   
-  -- ^ Parsing
+  -- * Lenses
+  module Lenses,
+  
+  -- * Parsing
   module Graphics.WaveFront.Parse,
   
-  -- ^ Model functions
+  -- * Model functions
   createModel, tessellate, bounds, fromIndices, fromFaceIndices, diffuseColours, hasTextures, textures,
 
-  -- ^ Loading
-  module Load
+  -- * Loading
+  module Load,
+
 ) where
 
 
@@ -54,4 +58,5 @@ import Graphics.WaveFront.Types
 import Graphics.WaveFront.Parse
 import Graphics.WaveFront.Parse.Common
 import Graphics.WaveFront.Model
+import Graphics.WaveFront.Lenses as Lenses
 import qualified Graphics.WaveFront.Load as Load
