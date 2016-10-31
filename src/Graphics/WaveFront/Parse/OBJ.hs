@@ -30,7 +30,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------
 module Graphics.WaveFront.Parse.OBJ (
   obj, row, face,
-  normal, texture, vertex, object, group,
+  normal, texcoord, vertex, object, group,
   lib, use,
   vertexIndices,
 ) where
