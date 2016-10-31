@@ -75,7 +75,7 @@ data OBJToken f s i m = OBJVertex   (V3 f) |
                         UseMTL s | -- TODO: Rename (eg. 'UseMaterial') (?)
                         LibMTL s | --
 
-                        SmoothShading Bool | -- s
+                        SmoothGroup (Maybe s) | -- Smooth shading group, or Nothing if it is disabled
 
 
                         -- TODO: Use OBJ prefix (?)

@@ -157,9 +157,10 @@ group :: Atto.Parser (OBJToken f Text i m)
 group = Group . S.fromList <$> atleast 1 (space *> name)
 
 
--- | Either 'on' or 'off'
+-- | Smoothing group
+-- TODO: Refactor
 smooth :: Atto.Parser (OBJToken f s i m)
-smooth = SmoothShading <$> (space *> toggle)
+smooth = SmoothGroup <$> ((Atto.string "off" <|> Atto.string "0") *> Nothing) <|> (space *> (Just <$> name))
 
 
 -- | An MTL library name
