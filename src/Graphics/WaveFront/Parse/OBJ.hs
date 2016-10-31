@@ -78,16 +78,16 @@ row = token <* ignore comment -- TODO: Let the separator handle comments (?)
 -- |
 -- Parses an OBJ token
 token :: (Fractional f, Integral i) => Atto.Parser (OBJToken f Text i [])
-token = (Atto.string "f"  *> face)    <|>
-        (Atto.string "l"  *> line)    <|>
+token = (Atto.string "f"  *> face)     <|>
+        (Atto.string "l"  *> line)     <|>
         -- TODO: How to deal with common prefix (v, vn, vt) (backtrack?) (doesn't seem to be a problem)
-        (Atto.string "vn" *> normal)  <|>
-        (Atto.string "vt" *> texture) <|>
-        (Atto.string "v"  *> vertex)  <|>
-        (Atto.string "o"  *> object)  <|>
-        (Atto.string "g"  *> group)   <|>
-        (Atto.string "s"  *> smooth)  <|>
-        (Atto.string "mtllib" *> lib) <|>
+        (Atto.string "vn" *> normal)   <|>
+        (Atto.string "vt" *> texcoord) <|>
+        (Atto.string "v"  *> vertex)   <|>
+        (Atto.string "o"  *> object)   <|>
+        (Atto.string "g"  *> group)    <|>
+        (Atto.string "s"  *> smooth)   <|>
+        (Atto.string "mtllib" *> lib)  <|>
         (Atto.string "usemtl" *> use)
 
     
@@ -138,8 +138,8 @@ normal = OBJNormal <$> point3D
 
 
 -- | Two coordinates, separated by whitespace
-texture :: (Fractional f) => Atto.Parser (OBJToken f Text i m)
-texture = OBJTexCoord <$> point2D
+texcoord :: (Fractional f) => Atto.Parser (OBJToken f Text i m)
+texcoord = OBJTexCoord <$> point2D
 
 
 -- | Three coordinates, separated by whitespace
