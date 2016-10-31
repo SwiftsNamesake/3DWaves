@@ -159,8 +159,8 @@ group = Group . S.fromList <$> atleast 1 (space *> name)
 
 -- | Smoothing group
 -- TODO: Refactor
-smooth :: Atto.Parser (OBJToken f s i m)
-smooth = SmoothGroup <$> ((Atto.string "off" <|> Atto.string "0") *> Nothing) <|> (space *> (Just <$> name))
+smooth :: Atto.Parser (OBJToken f Text i m)
+smooth = SmoothGroup <$> (((Atto.string "off" <|> Atto.string "0") *> pure Nothing) <|> (space *> (Just <$> name)))
 
 
 -- | An MTL library name
