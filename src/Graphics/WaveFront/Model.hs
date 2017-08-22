@@ -60,7 +60,7 @@ import           Data.Set (Set)
 import Data.List   (groupBy)
 import Data.Maybe  (listToMaybe, catMaybes)
 
-import Linear (V3(..))
+import Linear (V2(..), V3(..))
 
 import Control.Lens ((^.), (.~), (%~), (&), _1, _2, _3)
 
@@ -296,23 +296,44 @@ bounds model = fromExtents $ axisBounds (model^.vertices) <$> V3 x y z
 --   and uses the indices to constructs a new Vector with the data in the original vector.
 --
 -- TODO | - Factor out the buffer-building logic
---        - Rewrite the docs...
+--        - Rewrite the above docstring...
 fromIndices :: Vector v -> (Vector v -> i -> b) -> (a -> i) -> Vector a -> Vector b
 fromIndices data' index choose = V.map (index data' . choose)
 
 
 -- |
--- . fromIntegral . subtract 1
--- . (^.indices)
 fromFaceIndices :: Integral i => Vector (v f) -> (Vector (v f) -> a -> b) -> (VertexIndices i ->  a) -> Vector (Face f Text i Vector) -> Vector b
 fromFaceIndices data' index choose = V.concatMap (fromIndices data' index (choose) . (^.indices))
 
 
 -- |
+-- TODO: Factor out per-vertex logic so we don't have to redefine this function entirely for each colour type
 diffuseColours :: Vector (Face f s i Vector) -> Vector (Colour f)
 diffuseColours faces' = V.concatMap (\f -> V.replicate (V.length $ f^.indices) (f^.material.diffuse)) faces'
 
+-- TODO | - Do not create intermediate vectors (automatic fusion?)
+--        - Allow fallback values (or function), or use Either
+--        - Add docstrings
+
+-- |
+unindexedVertices :: Model f Text Int Vector -> Maybe (Vector (V3 f))
+unindexedVertices model = sequence $ fromFaceIndices (model^.vertices) (index) (^.ivertex) (model^.faces)
+  where
+    index coords i = coords !? (i-1)
+
+unindexedNormals :: Model f Text Int Vector -> Maybe (Vector (V3 f))
+unindexedNormals model = sequence $ fromFaceIndices (model^.normals) (index) (^.inormal) (model^.faces)
+  where
+    index coords mi = mi >>= \i -> coords !? (i-1)
+
+unindexedTexcoords :: Model f Text Int Vector -> Maybe (Vector (V2 f))
+unindexedTexcoords model = sequence $ fromFaceIndices (model^.texcoords) (index) (^.itexcoord) (model^.faces)
+  where
+    index coords mi = mi >>= \i -> coords !? (i-1)
+
 -- Model queries ---------------------------------------------------------------------------------------------------------------------------
+
+-- TODO: Turn into Lenses/Getters/Isos (?)
 
 -- | Does the model have textures?
 hasTextures :: Ord s => Model f s i m -> Bool

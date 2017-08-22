@@ -84,7 +84,7 @@ library
                        Graphics.WaveFront.Parse.MTL
 
   -- Compiler arguments
-  ghc-options:         -Wall
+  ghc-options:         -Wall -ddump-splices
 
   -- LANGUAGE extensions used by modules in this package.
   -- TODO: This list is incomplete

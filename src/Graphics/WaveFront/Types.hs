@@ -41,7 +41,7 @@ module Graphics.WaveFront.Types where
 -- We'll need these
 --------------------------------------------------------------------------------------------------------------------------------------------
 import Data.Functor.Classes (Show1) --Eq1, Show1, showsPrec1, eq1)
-import Data.Map as M
+import Data.Map as M (Map)
 import Data.Set as S (Set)
 import Linear (V2(..), V3(..))
 
@@ -146,7 +146,7 @@ type MTL f s m = m (MTLToken f s) -- (line number, MTL token, comment)
 
 
 -- |
-type MTLTable f s = M.Map s (M.Map s (Material f s))
+type MTLTable f s = Map s (Map s (Material f s))
 
 -- Model -----------------------------------------------------------------------------------------------------------------------------------
 
@@ -207,8 +207,8 @@ data Model f s i m = Model {
   fTexcoords :: m (V2 f),
   fFaces     :: m (Face f s i m),
   fMaterials :: MTLTable f s,         -- TODO: Type synonym (?)
-  fGroups    :: M.Map (Set s) (i, i), -- TODO: Type synonym
-  fObjects   :: M.Map (Set s) (i, i), -- TODO: Type synonym
+  fGroups    :: Map (Set s) (i, i), -- TODO: Type synonym
+  fObjects   :: Map (Set s) (i, i), -- TODO: Type synonym
   fRoot      :: Maybe FilePath        -- This is where we should look for related assets
 } -- deriving (Show, Eq)
 
